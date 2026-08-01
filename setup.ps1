@@ -1,125 +1,278 @@
 <#
 .SYNOPSIS
-    Bootstraps the C+ compiler using TinyCC (TCC).
+    Bootstraps the C+ compiler using an offline, local TinyCC (TCC) archive.
+
 .DESCRIPTION
-    Validates source files, resolves or downloads a compatible TCC compiler 
-    (including ARM architectures), compiles the C+ binaries, and safely 
-    updates the user's PATH environment variable.
+    Validates source files, resolves a local TCC compiler archive from the
+    'winzips' directory based on architecture, compiles the C+ binaries,
+    and safely updates the user's PATH environment variable.
 #>
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-# --- Configuration ---
-$Root  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Src   = Join-Path $Root "source\src\cplus.c"
-$Bin   = Join-Path $Root "bin"
+# ------------------------------------------------------------
+# Configuration
+# ------------------------------------------------------------
+
+$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+$Src = Join-Path $Root "source\src\cplus.c"
+$Bin = Join-Path $Root "bin"
 $Tools = Join-Path $Root "tools"
-$Executables = @("cplus.exe", "c+.exe", "cc+.exe")
 
-# --- Helper Functions ---
-function Write-Log { param([string]$Message, [string]$Level="INFO") Write-Host "[$Level] $Message" }
-function Write-Success { param([string]$Message) Write-Host "[SUCCESS] $Message" -ForegroundColor Green }
-function Write-ErrorLog { param([string]$Message) Write-Host "[ERROR] $Message" -ForegroundColor Red }
+$Executables = @(
+    "cplus.exe",
+    "c+.exe",
+    "cc+.exe"
+)
 
-function Get-TccDownloadUrl {
-    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-    switch ($arch) {
-        "X64"   { return "https://download-mirror.savannah.gnu.org/releases/tinycc/tcc-0.9.27-win64-bin.zip" }
-        "X86"   { return "https://download-mirror.savannah.gnu.org/releases/tinycc/tcc-0.9.27-win32-bin.zip" }
-        default { throw "Unsupported Windows architecture: $arch" }
-    }
+# ------------------------------------------------------------
+# Logging
+# ------------------------------------------------------------
+
+function Write-Log {
+    param(
+        [string]$Message,
+        [string]$Level = "INFO"
+    )
+
+    Write-Host "[$Level] $Message"
 }
+
+function Write-Success {
+    param(
+        [string]$Message
+    )
+
+    Write-Host "[SUCCESS] $Message" -ForegroundColor Green
+}
+
+function Write-ErrorLog {
+    param(
+        [string]$Message
+    )
+
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
+}
+
+# ------------------------------------------------------------
+# PATH Handling
+# ------------------------------------------------------------
 
 function Add-ToUserPath {
-    param([string]$NewDir)
-    
-    $NewDir = [System.IO.Path]::GetFullPath($NewDir).TrimEnd('\')
-    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    if (-not $userPath) { $userPath = "" }
-    
-    $pathEntries = @($userPath -split ";" | Where-Object { $_.Trim() -ne "" })
-    
-    $exists = $pathEntries | Where-Object { $_.TrimEnd('\') -ieq $NewDir }
-    
-    if (-not $exists) {
-        $pathEntries += $NewDir
-        $newUserPath = $pathEntries -join ";"
-        [Environment]::SetEnvironmentVariable("Path", $newUserPath, "User")
-        $env:Path = ($env:Path -split ";" | Where-Object { $_.Trim() -ne "" }) + $NewDir -join ";"
-        Write-Log "Added to User PATH: $NewDir"
-    } else {
-        Write-Log "Already in User PATH: $NewDir"
+    param(
+        [Parameter(Mandatory)]
+        [string]$Directory
+    )
+
+    $Directory = [System.IO.Path]::GetFullPath($Directory).TrimEnd('\')
+
+    $userPath = [Environment]::GetEnvironmentVariable(
+        "Path",
+        [EnvironmentVariableTarget]::User
+    )
+
+    if (-not $userPath) {
+        $userPath = ""
     }
+
+    $entries = @(
+        $userPath -split ";" |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -ne "" }
+    )
+
+    $exists = $entries | Where-Object {
+        $_.TrimEnd('\') -ieq $Directory
+    }
+
+    if ($exists) {
+        Write-Log "Already in User PATH: $Directory"
+        return
+    }
+
+    $entries += $Directory
+
+    $newPath = $entries -join ";"
+
+    [Environment]::SetEnvironmentVariable(
+        "Path",
+        $newPath,
+        [EnvironmentVariableTarget]::User
+    )
+
+    # Update current PowerShell session
+    $currentEntries = @(
+        $env:Path -split ";" |
+        Where-Object { $_.Trim() -ne "" }
+    )
+
+    $currentEntries += $Directory
+
+    $env:Path = $currentEntries -join ";"
+
+    Write-Log "Added to User PATH: $Directory"
 }
 
-# --- Main Execution ---
+# ------------------------------------------------------------
+# Main
+# ------------------------------------------------------------
+
 try {
+
     Write-Log "Starting C+ compiler setup..." "BOOTSTRAP"
 
-    # 1. Validate Source
+    # --------------------------------------------------------
+    # Validate source
+    # --------------------------------------------------------
+
     if (-not (Test-Path -LiteralPath $Src -PathType Leaf)) {
-        throw "Source file not found at: $Src"
+        throw "Source file not found: $Src"
     }
 
-    # 2. Resolve TCC
-    $tccCmd = Get-Command tcc -ErrorAction SilentlyContinue
-    if ($tccCmd) {
-        $TCC = $tccCmd.Source
+    # --------------------------------------------------------
+    # Find TCC
+    # --------------------------------------------------------
+
+    $tccCommand = Get-Command tcc -ErrorAction SilentlyContinue
+
+    if ($null -ne $tccCommand) {
+
+        $TCC = $tccCommand.Source
         $TCCDir = Split-Path -Parent $TCC
-        Write-Success "Found existing TCC installation: $TCC"
-    } else {
-        Write-Log "TCC not found locally. Preparing download..."
-        
-        $url = Get-TccDownloadUrl
-        $archiveName = Split-Path $url -Leaf
-        $zipPath = Join-Path $Tools $archiveName
-        $TCCDir = Join-Path $Tools "tcc"
-        $TCC = Join-Path $TCCDir "tcc.exe"
 
-        New-Item -ItemType Directory -Force -Path $Tools | Out-Null
-        
-        Write-Log "Downloading TCC from $url"
-        Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
-        
-        if (Test-Path $TCCDir) { Remove-Item -Recurse -Force $TCCDir }
-        
-        Write-Log "Extracting archive..."
-        Expand-Archive -LiteralPath $zipPath -DestinationPath $Tools -Force
-        
-        if (-not (Test-Path -LiteralPath $TCC -PathType Leaf)) {
-            throw "Extraction completed, but tcc.exe is missing."
+        Write-Success "Found TCC: $TCC"
+
+    } else {
+
+        Write-Log "TCC not found. Searching local archive..."
+
+        $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+
+        switch ($arch) {
+
+            "X64" {
+                $zipFilter = "*64*.zip"
+            }
+
+            "X86" {
+                $zipFilter = "*32*.zip"
+            }
+
+            default {
+                throw "Unsupported architecture: $arch"
+            }
         }
-        Write-Success "TCC installed to: $TCC"
+
+        $WinZipDir = Join-Path $Root "winzips"
+
+        if (-not (Test-Path $WinZipDir)) {
+            throw "Missing winzips directory: $WinZipDir"
+        }
+
+        $archives = @(
+            Get-ChildItem `
+                -Path $WinZipDir `
+                -Filter $zipFilter `
+                -File `
+                -ErrorAction SilentlyContinue
+        )
+
+        if ($archives.Count -eq 0) {
+            throw "No TCC archive found matching: $zipFilter"
+        }
+
+        $archive = $archives[0].FullName
+
+        New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $Tools |
+            Out-Null
+
+        if (Test-Path "$Tools\tcc") {
+            Remove-Item `
+                -Recurse `
+                -Force `
+                "$Tools\tcc"
+        }
+
+        Write-Log "Extracting: $archive"
+
+        Expand-Archive `
+            -LiteralPath $archive `
+            -DestinationPath $Tools `
+            -Force
+
+        $tccExe = Get-ChildItem `
+            -Path $Tools `
+            -Filter "tcc.exe" `
+            -Recurse |
+            Select-Object -First 1
+
+        if ($null -eq $tccExe) {
+            throw "Could not locate tcc.exe after extraction."
+        }
+
+        $TCC = $tccExe.FullName
+        $TCCDir = $tccExe.DirectoryName
+
+        Write-Success "Installed local TCC: $TCC"
     }
 
-    # 3. Create Directories
+    # --------------------------------------------------------
+    # Prepare directories
+    # --------------------------------------------------------
+
     New-Item -ItemType Directory -Force -Path $Bin | Out-Null
     New-Item -ItemType Directory -Force -Path $Tools | Out-Null
 
-    # 4. Compile C+
-    Write-Log "Compiling binaries..."
+    # --------------------------------------------------------
+    # Build compiler
+    # --------------------------------------------------------
+
     foreach ($name in $Executables) {
-        $outputPath = Join-Path $Bin $name
-        $process = Start-Process -FilePath $TCC -ArgumentList "-o `"$outputPath`" `"$Src`"" -Wait -NoNewWindow -PassThru
-        
-        if ($process.ExitCode -ne 0) {
-            throw "TCC compilation failed for $name with exit code $($process.ExitCode)"
+
+        $output = Join-Path $Bin $name
+
+        Write-Log "Building $name..."
+
+        & $TCC -o $output $Src
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "TCC failed while building $name."
         }
-        Write-Success "Built $name -> $outputPath"
+
+        Write-Success "Built: $output"
     }
 
-    # 5. Update PATH
-    Write-Log "Updating environment variables..."
+    # --------------------------------------------------------
+    # PATH
+    # --------------------------------------------------------
+
     Add-ToUserPath $Bin
     Add-ToUserPath $Tools
     Add-ToUserPath $TCCDir
 
-    Write-Success "C+ compiler successfully built and configured."
-    Write-Log "Commands available: cplus, c+, cc+, tcc"
-    Write-Log "New terminals will automatically inherit the updated PATH."
+    Write-Host ""
 
-} catch {
+    Write-Success "C+ compiler successfully built."
+
+    Write-Host ""
+    Write-Host "Available commands:"
+    Write-Host "  cplus"
+    Write-Host "  c+"
+    Write-Host "  cc+"
+    Write-Host "  tcc"
+
+    Write-Host ""
+    Write-Host "New terminals will inherit the updated PATH."
+
+}
+catch {
+
     Write-ErrorLog $_.Exception.Message
     exit 1
+
 }
