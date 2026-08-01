@@ -16,7 +16,7 @@ Currently, C+ provides pre-built compiler packages for:
 Windows ARM/ARM64 is currently not supported.
 
 ## What is C+?
-Simply put, **C+ is my C++ dialect made a language**. It gives a lot of functionality beyond C's simple structs, as it introduces proper namespaces, scoped enums, and better structs that can actually have methods with the lowering being C-like (more on that below).
+Simply put, **C+ started as my C++ dialect, but grew into its own language**. It gives a lot of functionality beyond C's simple structs, as it introduces proper namespaces, scoped enums, and better structs that can actually have methods with the lowering being C-like (more on that below).
 
 Not only does C+ introduce the concept of deferring to the low-level languages, but it also changes it quite the bit from Go's `defer`. Instead of being executed as soon as this code block stops, it simply is moved to the end of its lexical scope, meaning an early return will leak memory if not handled in that branch. This approach to deferring was done, so that the programmer can see what's gonna happen at the end, assuming everything went fine, directly at declaration of an instance.
 > Why did I choose 'defer'? Because I didn't know what else to call it.
