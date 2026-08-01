@@ -1,0 +1,73 @@
+Priority 2/10 : Making libc+
+
+
+[[
+    Priority 9/10 : Making the C+ pre-processor in the C+ compiler
+    |> Therefore also adding proper Header inclusion
+        ^^ (so that there is no unknown qualified name if it exists in an included header)
+    |> #include <...> looks in .cplus/libc+/* and matches the source name to whatever file (without extension)
+    |> also has that, you can optionally add the extension, e.g. #include <libc+.hp>, though #include <libc+> would suffice
+    |> the compiler will first look for .hp and then .h+ extensions before looking if you have a local include folder
+    |> in the CWD, if you do, it looks in there, if not, it'll say it couldn't find the file.
+    |> ONLY #include <...> that have either no extension or .hp or .h+ extension are passed to the C+ pre-processor
+    |> the rest is kept as-is and transmitted over to the resulting C file, so that TCC can resolve those includes
+    |> #include "..." is also supported and is file-relative with no automatic search
+]] -> DONE
+
+
+Priority 4/10 : Adding better error reporting and diagnostics
+
+
+[[
+Priority 6/10 : Add 'defer' blocks
+]] -> DONE
+
+
+[[
+Priority 7/10 : Add a better switch that always compiles down to an if-chain unless break is used in any case
+                ^^ (compatibility reasons)
+    |> then it falls through as a normal C-switch
+    |> this also includes for cases to handle things such as:
+        case 0 => 10: ...
+    |> '=>'  is the "inclusive-exclusive" range-operator (..  in Rust)
+    |> '==>' is the "inclusive-inclusive" range-operator (..= in Rust)
+    |> things such as:
+        switch (x)
+        {
+            case isspace(_):
+                foo();
+            default:
+                bar();
+        }
+    |> where _ is treated as the implicit argument, is replaced by the actual switch argument during codegen
+]] -> DONE
+
+
+Priority 2/10 : Making an LSP for C+
+Priority 5/10 : Adding small generic support in C+
+    |> instead of using template<...>, C+ uses specify<...>
+    |> example:
+        specify<typename T>
+        T add(T l, T r)
+        {
+            return l + r;
+        }
+        int main()
+        {
+            add:<int>(3, 6);
+        }
+    |> at the call-site, the generic syntax will result in being the "SMALLFISH" (:<...>)
+    |> Types can have constraints via this, though constraints are only for what fields/methods a struct/type has:
+        specify<typename T : T::StringInto(_)>
+        void print(T to_print)
+        {
+            std::print(to_print.StringInto());
+        }
+    |> The above shown _ again means that the compiler doesn't need to care what arguments are passed into StringInto
+    |> You can specify them, e.g. typename T : T::StringInto(void *t, Formatter *f), or whatever, but _ is more general
+    |> Mangling for generics will be done using monomorphization and also using __ as the seperator between function name
+    |> and the generic arguments, e.g. add:<int> will be mangled into add__int, add:<int, float> will be mangled
+    |> and the output will be add__int__float
+Priority 10/10: Splitting the current one-file monstrosity (cplus.c) into multiple smaller more maintable files
+    |> this means headers (source/include) and C files (source/src)
+    |> the main file is named main.c or main.cplus.c or main-cplus.c, preferably the latter

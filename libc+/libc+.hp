@@ -1,0 +1,71 @@
+#ifndef _LIBCP_HP
+#define _LIBCP_HP
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif // #ifdef _WIN32
+
+namespace std
+{
+    #ifdef _WIN32
+    typedef unsigned long long ptrsize_t;
+    #else
+    typedef unsigned long ptrsize_t;
+    #endif
+    typedef ptrsize_t size_t;
+
+/*
+
+    HELPERS
+
+*/
+
+    std::size_t _chpLength(const char *const _chpString)
+    {
+        std::size_t total = 0;
+        for (;_chpString[total];total++){}
+        return total;
+    } // std::size_t std::_chpLength(const char *const _chpString)
+
+    std::size_t _chpLengthPadding(const char *const _chpString)
+    {
+        std::size_t total = 1;
+        for (;_chpString[total];total++){}
+        return total;
+    } // std::size_t std::_chpLengthPadding(const char *const _chpString)
+}
+
+namespace std
+{
+
+    void write_stdout(const char *const _chpString, std::ptrsize_t _pszLength)
+    {
+#ifdef _WIN32
+        DWORD written = 0;
+
+        WriteFile(
+            GetStdHandle(STD_OUTPUT_HANDLE),
+            _chpString,
+            static_cast<DWORD>(_pszLength),
+            &written,
+            NULL
+        );
+#else
+        write(STDOUT_FILENO, _chpString, _pszLength);
+#endif
+    } // void std::write_stdout(const char *const _chpString, std::ptrsize_t _pszLength)
+
+    void print(const char *const _chpString)
+    {
+        std::write_stdout(_chpString, std::_chpLength(_chpString));
+    } // void std::print(const char *const _chpString)
+
+    void hello()
+    {
+        std::write_stdout("Hello World!", 12 /* because lengthWithNull - 1 */);
+    } // void std::hello()
+}
+
+#endif // #ifndef _LIBCP_HP
