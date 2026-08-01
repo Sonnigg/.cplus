@@ -18,6 +18,7 @@ There is no reason as to why you shouldn't just use C++ is something you might s
 
 ## Code examples in C+
 
+General struct showcase:
 ```cx
 namespace app
 {
@@ -38,6 +39,18 @@ int main()
         health: 100,
     };
     player.damage(10);
+    return 0;
+}
+```
+
+"Hello, World!" showcase:
+```cx
+#include <libc+>
+
+int main()
+{
+    std::hello();
+    return 0;
 }
 ```
 
