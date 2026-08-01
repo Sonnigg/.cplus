@@ -1,0 +1,179 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "C+",
+  "scopeName": "source.cx",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#preprocessor"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#variables"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.cx",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.cx",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "preprocessor": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.include.cx",
+          "begin": "(#\\s*include)\\b",
+          "end": "(?=>|$)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.preprocessor.include.cx"
+            }
+          },
+          "patterns": [
+            {
+              "name": "string.quoted.angle.cx",
+              "begin": "<",
+              "end": ">",
+              "patterns": [
+                {
+                  "name": "constant.character.escape.cx",
+                  "match": "\\\\."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "keyword.preprocessor.cx",
+          "match": "\\#\\b(ifdef|define|ifndef|endif|else|elif|error|line|pragma|if|undef)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.cx",
+          "match": "\\b(if|else|while|for|do|switch|case|default|break|continue|return|goto|defer)\\b"
+        },
+        {
+          "name": "keyword.declaration.cx",
+          "match": "\\b(namespace|struct|enum|typedef|inline|static|const)\\b"
+        },
+        {
+          "name": "keyword.constant.cx",
+          "match": "\\b(static_cast|sizeof)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.cx",
+          "match": "\\b(void|char|short|int|long|float|double|bool|unsigned|signed)\\b"
+        },
+        {
+          "name": "storage.type.cx",
+          "match": "(?<=\\b(void|char|short|int|long|float|double|bool|unsigned|signed)\\b)\\s*[\\*]+"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.cx",
+          "match": "\\b(nullptr|true|false)\\b"
+        },
+        {
+          "name": "constant.numeric.cx",
+          "match": "\\b([0-9]+(\\.[0-9]+)?)\\b"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "entity.name.function.cx",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b(?=\\()"
+        },
+        {
+          "name": "entity.name.class.cx",
+          "match": "(?<=\\b(struct|enum)\\b)\\s*\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b"
+        },
+        {
+          "name": "entity.name.namespace.cx",
+          "match": "(?<=\\b(namespace)\\b)\\s*\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b"
+        },
+        {
+          "name": "entity.name.namespace.cx",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b\\s*(?=\\:\\:)"
+        },
+        {
+          "name": "entity.name.type.cx",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)_[tT]\\b"
+        },
+        {
+          "name": "variable.other.cx",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.cx",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.cx",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.cx",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.cx",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.scope.cx",
+          "match": "::"
+        }
+      ]
+    }
+  }
+}

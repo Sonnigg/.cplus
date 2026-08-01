@@ -7,10 +7,7 @@ bin/cc+.exe
 bin/cplus.exe
 second_tests/
 cx/.vscode
-cx/syntaxes
 cx/.vscodeignore
 cx/extension.js
 cx/extension.js.new
-cx/language-configuration.json
-cx/package.json
 cx/package.json.new
