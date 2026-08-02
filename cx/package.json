@@ -23,16 +23,34 @@
         ],
         "extensions": [
           ".c+",
-          ".cp",
+          ".cp"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "hx",
+        "aliases": [
+          "C+ Header"
+        ],
+        "extensions": [
           ".h+",
           ".hp"
         ],
+        "icon": {
+          "dark": "cplus-header-icon.png",
+          "light": "cplus-header-icon.png"
+        },
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
         "language": "cx",
+        "scopeName": "source.cx",
+        "path": "./syntaxes/cx.tmLanguage.json"
+      },
+      {
+        "language": "hx",
         "scopeName": "source.cx",
         "path": "./syntaxes/cx.tmLanguage.json"
       }

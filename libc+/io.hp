@@ -1,0 +1,92 @@
+#ifndef _IO_HP
+#define _IO_HP
+
+#include <__utilities>
+#include <types>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+namespace std
+{
+
+    void write_stdout(const char *const _chpString, std::ptrsize_t _pszLength)
+    {
+#ifdef _WIN32
+        DWORD written = 0;
+
+        WriteFile(
+            GetStdHandle(STD_OUTPUT_HANDLE),
+            _chpString,
+            static_cast<DWORD>(_pszLength),
+            &written,
+            nullptr
+        );
+#else
+        write(STDOUT_FILENO, _chpString, _pszLength);
+#endif
+    } // void std::write_stdout(const char *const _chpString, std::ptrsize_t _pszLength)
+
+    void write_stderr(const char *const _chpString, std::ptrsize_t _pszLength)
+    {
+#ifdef _WIN32
+        DWORD written = 0;
+
+        WriteFile(
+            GetStdHandle(STD_ERROR_HANDLE),
+            _chpString,
+            static_cast<DWORD>(_pszLength),
+            &written,
+            nullptr
+        );
+#else
+        write(STDERR_FILENO, _chpString, _pszLength);
+#endif
+    }
+
+    /**
+     * Puts a string to stdout
+     **/
+    void puts(
+        const char *const _chpString
+    )
+    {
+        std::write_stdout(_chpString, std::_chpLength(_chpString));
+    } // void std::puts(const char *const _chpString)
+
+    /**
+     * Puts a character to stdout 
+     **/
+    void putc(
+        const char _chChar
+    )
+    {
+        std::write_stdout(&_chChar, 1);
+    } // void std::putc(const char _chChar)
+
+    /**
+     * Puts a string to stderr
+     **/
+    void errputs(
+        const char *const _chpString
+    )
+    {
+        std::write_stderr(_chpString, std::_chpLength(_chpString));
+    } // void std::errputs(const char *const _chpString)
+
+    /**
+     * Puts a character to stderr
+     **/
+    void errputc(
+        const char _chChar
+    )
+    {
+        std::write_stderr(&_chChar, 1);
+    } // void std::errputs(const char _chpChar)
+
+} // namespace std
+
+#endif

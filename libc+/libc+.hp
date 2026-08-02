@@ -9,14 +9,12 @@
 #include <unistd.h>
 #endif // #ifdef _WIN32
 
+#include <io>
+#include <__utilities>
+#include <types>
+
 namespace std
 {
-    #ifdef _WIN32
-    typedef unsigned long long ptrsize_t;
-    #else
-    typedef unsigned long ptrsize_t;
-    #endif
-    typedef ptrsize_t size_t;
 
     enum OS
     {
@@ -29,7 +27,7 @@ namespace std
         Android,
         IOS,
         Unknown
-    }
+    } // enum OS
 
     enum Arch
     {
@@ -45,13 +43,13 @@ namespace std
         Wasm32,
         Wasm64,
         Unknown
-    }
+    } // enum Arch
     
     enum Endian
     {
         Little,
         Big
-    }
+    } // enum Endian
 
     struct Platform
     {
@@ -79,57 +77,14 @@ namespace std
         {
             return self->__ptr_size;
         }
-    }
-
-/*
-
-    HELPERS
-
-*/
-
-    std::size_t _chpLength(const char *const _chpString)
-    {
-        std::size_t total = 0;
-        for (;_chpString[total];total++){}
-        return total;
-    } // std::size_t std::_chpLength(const char *const _chpString)
-
-    std::size_t _chpLengthPadding(const char *const _chpString)
-    {
-        std::size_t total = 1;
-        for (;_chpString[total];total++){}
-        return total;
-    } // std::size_t std::_chpLengthPadding(const char *const _chpString)
+    } // struct Platform
 }
 
 namespace std
 {
-
-    void write_stdout(const char *const _chpString, std::ptrsize_t _pszLength)
-    {
-#ifdef _WIN32
-        DWORD written = 0;
-
-        WriteFile(
-            GetStdHandle(STD_OUTPUT_HANDLE),
-            _chpString,
-            static_cast<DWORD>(_pszLength),
-            &written,
-            NULL
-        );
-#else
-        write(STDOUT_FILENO, _chpString, _pszLength);
-#endif
-    } // void std::write_stdout(const char *const _chpString, std::ptrsize_t _pszLength)
-
-    void printSingle(const char *const _chpString)
-    {
-        std::write_stdout(_chpString, std::_chpLength(_chpString));
-    } // void std::printSingle(const char *const _chpString)
-
     void hello()
     {
-        std::write_stdout("Hello World!", 12 /* because lengthWithNull - 1 */);
+        std::write_stdout("Hello World!\n", 13 /* because lengthWithNull - 1 */);
     } // void std::hello()
 
     std::Platform platform()
@@ -229,7 +184,7 @@ namespace std
         {
             unsigned int value = 1;
 
-            if (*(unsigned char *)&value)
+            if (*static_cast<unsigned char *>(&value))
                 p.__endian = std::Endian::Little;
             else
                 p.__endian = std::Endian::Big;
@@ -240,7 +195,7 @@ namespace std
         p.__ptr_size = sizeof(void *);
 
         return p;
-    }
-}
+    } // std::Platform std::platform()
+} // namespace std
 
 #endif // #ifndef _LIBCP_HP

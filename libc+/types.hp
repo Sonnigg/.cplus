@@ -1,0 +1,9 @@
+namespace std
+{
+    #ifdef _WIN32
+    typedef unsigned long long ptrsize_t; // std::ptrsize_t
+    #else
+    typedef unsigned long ptrsize_t; // std::ptrsize_t
+    #endif
+    typedef ptrsize_t size_t; // std::size_t
+} // namespace std
