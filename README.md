@@ -11,9 +11,9 @@ Shortcut to the source  : [source](./source/)
 ## IMPORTANT
 
 Currently, C+ provides pre-built compiler packages for:
-- [Windows x86/x86_64](winzips\)
-- [Linux x86/x86_64](tar-bz\)
-- [Linux ARM64/aarch64](arm-arch\)
+- [Windows x86 and x86_64](./winzips/)
+- [Linux x86 and x86_64](./tar-bz/)
+- [Linux ARM64 and aarch64](./arm-arch/)
 
 Windows ARM64 is currently not supported.
 
