@@ -8,3 +8,4 @@ cx/.vscode
 cx/.vscodeignore
 cx/extension.js
 cx/*.new
+*.txt
