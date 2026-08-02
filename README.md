@@ -1,7 +1,6 @@
 # INTRODUCING C+
 
-<img src="cx/cplus-icon.png" alt="C+ Logo" width="128" height="128">
-<img src="cx/cplus-header-icon.png" alt="C+ Logo" width="128" height="128">
+<img src="cx/cplus-icon.png" alt="C+ Logo" width="128" height="128"><img src="cx/cplus-header-icon.png" alt="C+ Header Logo" width="128" height="128">
 
 Shortcut to the license : [LICENSE](./LICENSE)
 
