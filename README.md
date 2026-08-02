@@ -9,11 +9,11 @@ Shortcut to the source  : [source](./source/)
 ## IMPORTANT
 
 Currently, C+ provides pre-built compiler packages for:
-- Windows x86/x86_64
-- Linux x86/x86_64
-- Linux ARM64/aarch64
+- [Windows x86/x86_64](winzips\)
+- [Linux x86/x86_64](tar-bz\)
+- [Linux ARM64/aarch64](arm-arch\)
 
-Windows ARM/ARM64 is currently not supported.
+Windows ARM64 is currently not supported.
 
 ## What is C+?
 Simply put, **C+ started as my C++ dialect, but grew into its own language**. It gives a lot of functionality beyond C's simple structs, as it introduces proper namespaces, scoped enums, and better structs that can actually have methods with the lowering being C-like (more on that below).
