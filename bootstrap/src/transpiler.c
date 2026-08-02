@@ -193,6 +193,17 @@ static void buffer_insert(Buffer *b, size_t at_pos, const char *s)
     b->len += n;
 }
 
+static bool buffer_has_non_whitespace(const Buffer *b)
+{
+    if (!b || b->len == 0 || !b->data) return false;
+    for (size_t i = 0; i < b->len; ++i) {
+        if (!isspace((unsigned char)b->data[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static size_t matching(Transpiler *t, size_t open, TokenKind left, TokenKind right, size_t end)
 {
     int d = 0;
@@ -843,15 +854,28 @@ static bool try_emit_defer_block(Transpiler *t, NamespaceStack *ns, size_t *pp, 
     size_t open, close;
     DeferScope *scope;
     Buffer emitted;
+
     if (!token_is(at(t, p), "defer") || p + 1 >= end || at(t, p + 1)->kind != TOK_LBRACE) return false;
+    
     open = p + 1;
     close = matching(t, open, TOK_LBRACE, TOK_RBRACE, end);
+    
+    // Find the nearest active defer stack frame. 
     scope = defer_stack_current(&t->defers);
     if (!scope) return false;
+
+    // Isolate the output of the defer body.
     buffer_init(&emitted);
     emit_fragment_to_buffer(&emitted, t, ns, open + 1, close);
+
+    // Save it into the current scope, but do NOT write it to the main output yet.
+    // In a Go-like defer, these execute in LIFO order, so we prepend or just append
+    // and reverse later when writing.
+    // For simplicity, we append here.
     buffer_puts(&scope->output, emitted.data);
+    
     buffer_free(&emitted);
+    
     *pp = close + 1;
     return true;
 }
@@ -1094,6 +1118,42 @@ static void emit_one(Transpiler *t, NamespaceStack *ns, size_t *pp, size_t end)
     if (try_emit_defer_block(t, ns, pp, end)) return;
     if (try_emit_switch(t, ns, pp, end)) return;
     if (try_emit_header_include(t, pp)) return;
+
+/* --- NEW GO-LIKE DEFER LOGIC --- */
+    if (x->kind == TOK_IDENTIFIER && token_is(x, "return")) {
+        // Emit whitespace for the return first so formatting stays clean
+        emit_ws(&t->output, x);
+        
+        if (t->defers.count > 0) {
+            // Pre-check if any defer scope actually has non-whitespace content
+            bool has_defer_content = false;
+            for (size_t d = t->defers.count; d > 0; --d) {
+                if (buffer_has_non_whitespace(&t->defers.items[d - 1].output)) {
+                    has_defer_content = true;
+                    break;
+                }
+            }
+
+            // Only emit the block if we have actual code to write
+            if (has_defer_content) {
+                buffer_puts(&t->output, "{ ");
+                for (size_t d = t->defers.count; d > 0; --d) {
+                    DeferScope *scope = &t->defers.items[d - 1];
+                    if (buffer_has_non_whitespace(&scope->output)) {
+                        buffer_puts(&t->output, scope->output.data);
+                    }
+                }
+                buffer_puts(&t->output, " } ");
+            }
+        }
+
+        // Now actually write the word 'return'
+        buffer_puts(&t->output, "return");
+        ++*pp;
+        return;
+    }
+    /* ------------------------------- */
+
     if (looks_like_c_style_cast(t, ns, p, end)) {
         warn_at(x, "C-style cast; prefer static_cast<Type>(expression)");
     }
@@ -1228,6 +1288,7 @@ static void emit_body(Transpiler *t, NamespaceStack *ns, size_t begin, size_t cl
     size_t p = begin;
     t->local_depth = 1;
     defer_stack_push(&t->defers);
+    
     while (p < close) {
         VarDecl d;
         if (parse_var_decl(t, ns, p, close, &d)) {
@@ -1235,6 +1296,7 @@ static void emit_body(Transpiler *t, NamespaceStack *ns, size_t begin, size_t cl
             local_add(&t->locals, name, d.type->qualified_name, d.pointer_depth, t->local_depth);
             free(name);
         }
+        
         if (at(t, p)->kind == TOK_LBRACE) {
             defer_stack_push(&t->defers);
             emit_full(&t->output, at(t, p));
@@ -1242,11 +1304,15 @@ static void emit_body(Transpiler *t, NamespaceStack *ns, size_t begin, size_t cl
             ++p;
             continue;
         }
+        
         if (at(t, p)->kind == TOK_RBRACE) {
             DeferScope *scope = defer_stack_current(&t->defers);
-            if (scope && scope->output.len) {
+            
+            // STRICT CHECK: Only dump if there is actual deferred code
+            if (buffer_has_non_whitespace(&scope->output)) {
                 buffer_puts(&t->output, scope->output.data);
             }
+            
             defer_stack_pop(&t->defers);
             locals_leave(&t->locals, t->local_depth);
             --t->local_depth;
@@ -1254,14 +1320,20 @@ static void emit_body(Transpiler *t, NamespaceStack *ns, size_t begin, size_t cl
             ++p;
             continue;
         }
+        
         emit_one(t, ns, &p, close);
     }
+    
+    // Catch any final defers at the very end of the function body
     if (t->defers.count) {
         DeferScope *scope = defer_stack_current(&t->defers);
-        if (scope && scope->output.len) {
+        
+        // STRICT CHECK: Only dump if there is actual deferred code
+        if (buffer_has_non_whitespace(&scope->output)) {
             buffer_puts(&t->output, scope->output.data);
         }
     }
+    
     defer_stack_pop(&t->defers);
 }
 
@@ -1447,9 +1519,11 @@ void transpile(Transpiler *t)
 #ifdef _WIN32
     buffer_puts(&t->output, "/* Generated by C+ compiler. DO NOT EDIT. */\r\n\r\n");
     buffer_puts(&t->output, "#ifndef CMPL__PTR_SIZE\r\n#if defined(_WIN64) || defined(__x86_64__)\r\n#define CMPL__PTR_SIZE 8\r\n#else\r\n#define CMPL__PTR_SIZE 4\r\n#endif\r\n#endif\r\n\r\n");
+    buffer_puts(&t->output, "#ifndef true\r\n#define true 1\r\n#endif\r\n#ifndef false\r\n#define false 0\r\n#endif\r\n\r\n");
 #else
     buffer_puts(&t->output, "/* Generated by C+ compiler. DO NOT EDIT. */\n\n");
     buffer_puts(&t->output, "#ifndef CMPL__PTR_SIZE\n#if defined(__x86_64__) || defined(__aarch64__) || defined(__riscv64) || defined(__loongarch64)\n#define CMPL__PTR_SIZE 8\n#else\n#define CMPL__PTR_SIZE 4\n#endif\n#endif\n\n");
+    buffer_puts(&t->output, "#ifndef true\n#define true 1\n#endif\n#ifndef false\n#define false 0\n#endif\n\n");
 #endif
     discover_range(t, &ns, 0, t->tokens.count - 1);
     transpile_range(t, &ns, 0, t->tokens.count - 1);
