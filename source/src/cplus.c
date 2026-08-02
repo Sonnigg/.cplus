@@ -6,6 +6,8 @@
  * then resolution/lowering.  Names are resolved before they are mangled.
  */
 
+// I should definitely split this across files... oh my god
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
