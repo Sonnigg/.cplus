@@ -13,6 +13,10 @@
     "languages": [
       {
         "id": "cx",
+        "icon": {
+          "dark": "cplus-icon.png",
+          "light": "cplus-icon.png"
+        },
         "aliases": [
           "C+",
           "c+"
@@ -33,5 +37,9 @@
         "path": "./syntaxes/cx.tmLanguage.json"
       }
     ]
-  }
+  },
+  "repository": {
+    "url": "https://github.com/Sonnigg/.cplus"
+  },
+  "icon": "cplus-icon.png"
 }

@@ -122,10 +122,10 @@ namespace std
 #endif
     } // void std::write_stdout(const char *const _chpString, std::ptrsize_t _pszLength)
 
-    void print(const char *const _chpString)
+    void printSingle(const char *const _chpString)
     {
         std::write_stdout(_chpString, std::_chpLength(_chpString));
-    } // void std::print(const char *const _chpString)
+    } // void std::printSingle(const char *const _chpString)
 
     void hello()
     {

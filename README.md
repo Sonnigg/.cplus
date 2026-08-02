@@ -1,5 +1,7 @@
 # INTRODUCING C+
 
+<img src="cx/cplus-icon.png" alt="C+ Logo" width="128" height="128">
+
 Shortcut to the license : [LICENSE](./LICENSE)
 
 Shortcut to libc+       : [libc+](./libc+/)
