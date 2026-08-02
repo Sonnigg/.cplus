@@ -17,7 +17,7 @@ Set-StrictMode -Version Latest
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-$Src = Join-Path $Root "source\src\cplus.c"
+$Src = Join-Path $Root "bootstrap\src\cplus.c"
 $Bin = Join-Path $Root "bin"
 $Tools = Join-Path $Root "tools"
 

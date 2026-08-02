@@ -9,7 +9,7 @@ set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
-SRC="$ROOT/source/src/cplus.c"
+SRC="$ROOT/bootstrap/src/cplus.c"
 BIN="$ROOT/bin"
 TOOLS="$ROOT/tools"
 
