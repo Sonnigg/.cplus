@@ -2283,21 +2283,100 @@ static int run_process(Arguments *a)
 }
 #endif
 
+// Helper function to extract a JSON string value given a key search context
+static bool extract_json_value(const char *json, const char *key, char *dest, size_t dest_size) {
+    char search_pattern[128];
+    snprintf(search_pattern, sizeof(search_pattern), "\"%s\"", key);
+    
+    const char *p = strstr(json, search_pattern);
+    if (!p) return false;
+    
+    // Move past the key and find the colon
+    p = strchr(p, ':');
+    if (!p) return false;
+    
+    // Skip whitespace and quotes
+    while (*p && (*p == ':' || *p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' || *p == '"')) {
+        p++;
+    }
+    
+    // Copy until the closing quote or delimiter
+    size_t i = 0;
+    while (*p && *p != '"' && *p != ',' && *p != '}' && i < dest_size - 1) {
+        dest[i++] = *p++;
+    }
+    dest[i] = '\0';
+    return i > 0;
+}
+
+// Specific helper to target nested dependency versions (e.g., inside "dependencies": { "tcc": { "version": "..." } })
+static bool extract_nested_dependency_version(const char *json, const char *dep_name, char *dest, size_t dest_size) {
+    char dep_pattern[128];
+    snprintf(dep_pattern, sizeof(dep_pattern), "\"%s\"", dep_name);
+    
+    const char *p = strstr(json, dep_pattern);
+    if (!p) return false;
+    
+    // Search for "version" subsequent to the dependency block declaration
+    return extract_json_value(p, "version", dest, dest_size);
+}
+
 static void usage(void)
 {
-    puts(
-        "C+ compiler\n\n"
+    char cplus_version[32] = "unknown";
+    char *manifest = read_file("manifest.json");
+    if (manifest) {
+        extract_json_value(manifest, "version", cplus_version, sizeof(cplus_version));
+        free(manifest);
+    }
+
+    printf(
+        "C+ compiler (v%s)\n\n"
+        "Version:\n"
+        "  %s\n"
+        "Extensions:\n"
+        "  .cp\n"
+        "  .c+\n"
+        "  .hp\n"
+        "  .h+\n\n"
         "Usage:\n"
-        "  c+ [options] file.c+\n\n"
+        "  c+    [options] file.('cp'|'c+')\n"
+        "  cc+   [options] file.('cp'|'c+')\n"
+        "  cplus [options] file.('cp'|'c+')\n\n"
         "  Options:\n"
-        "  -o <file>     Output executable or file\n  "
-        "  -c            Compile to an object file\n  "
+        "  -v, --version Outputs the installed C+ version and exits\n"
+        "  -h, --help    Outputs this message and exits\n"
+        "  -o <file>     Output executable or file\n"
+        "  -c            Compile to an object file\n"
         "  -C            Emit generated C only and exit\n"
         "  -D <macro>    Define preprocessor macro (forwarded to TCC)\n"
         "  -I <dir>      Add include directory (forwarded to TCC)\n"
         "  --keep-c      Keep generated .gencx.c file\n"
         "  --index       Emit token index for IDE highlighting services\n"
-        "  --            Stop processing C+ options\n"
+        "  --            Stop processing C+ options\n",
+        cplus_version, cplus_version
+    );
+}
+
+static void version(void)
+{
+    char cplus_version[32] = "unknown";
+    char tcc_version[32] = "unknown";
+    
+    char *manifest = read_file("manifest.json");
+    if (manifest) {
+        extract_json_value(manifest, "version", cplus_version, sizeof(cplus_version));
+        extract_nested_dependency_version(manifest, "tcc", tcc_version, sizeof(tcc_version));
+        free(manifest);
+    }
+
+    printf(
+        "C+ version:\n"
+        "  %s\n"
+        "TCC version:\n"
+        "  %s\n",
+        cplus_version,
+        tcc_version
     );
 }
 
@@ -2341,6 +2420,14 @@ int main(int argc, char **argv)
         if (!endopt && strcmp(a, "--") == 0) {
             endopt = true;
             continue;
+        }
+        if (!endopt && (!strcmp(a, "-h") || !strcmp(a, "--help")) /* checks for -h or --help */) {
+            usage();
+            return 0;
+        }
+        if (!endopt && (!strcmp(a, "-v") || !strcmp(a, "--version")) /* checks for -v or --version */) {
+            version();
+            return 0;
         }
         if (!endopt && strcmp(a, "-o") == 0) {
             if (++i >= argc) die("-o requires an argument");

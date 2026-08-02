@@ -1,0 +1,15 @@
+{
+    "name": [
+        "c+",
+        "cc+",
+        "cplus"
+    ],
+    "version": "0.3.0",
+    "dependencies": {
+        "tcc": {
+            "version": "0.9.27",
+            "source": "local-files"
+        }
+    },
+    "comes-with-dependencies": true
+}
