@@ -1,13 +1,10 @@
 tools/
 tests/
-benchmark.csv
+*.csv
 test_executables/
-bin/c+.exe
-bin/cc+.exe
-bin/cplus.exe
+bin/*.exe
 second_tests/
 cx/.vscode
 cx/.vscodeignore
 cx/extension.js
-cx/extension.js.new
-cx/package.json.new
+cx/*.new
