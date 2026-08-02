@@ -44,6 +44,7 @@ Priority 7/10 : Add a better switch that always compiles down to an if-chain unl
 
 
 Priority 2/10 : Making an LSP for C+
+
 Priority 5/10 : Adding small generic support in C+
     |> instead of using template<...>, C+ uses specify<...>
     |> example:
@@ -68,6 +69,43 @@ Priority 5/10 : Adding small generic support in C+
     |> Mangling for generics will be done using monomorphization and also using __ as the seperator between function name
     |> and the generic arguments, e.g. add:<int> will be mangled into add__int, add:<int, float> will be mangled
     |> and the output will be add__int__float
+
 Priority 10/10: Splitting the current one-file monstrosity (cplus.c) into multiple smaller more maintable files
     |> this means headers (source/include) and C files (source/src)
     |> the main file is named main.c or main.cplus.c or main-cplus.c, preferably the latter
+
+Priority 8/10 : Adding constexpr support for functions and conditionals as-well as for switch to replace #ifdef parts in newer C+
+
+Priority 5/10 : Adding compiler intrinsics for architecture and OS
+    |> Also adding std::platform() to libc+.hp and making it return a struct "Platform" that has methods .os() and .arch() for the specifics
+    |> std::platform().os() will return an std::OS::* instead of a string
+    |> std::platform().arch() will return an std::Arch::* instead of a string
+
+Priority 8/10 : Adding some form of RAII to C+ and re-implementing defer to be a Go-like defer
+    |> planned keyword will be 'destructor' in this form:
+        specify<typename T>
+        struct String
+        {
+            T *data;
+            std::size_t length;
+
+            void destructor(String *self)
+            {
+                free(self->data);
+            }
+        }
+    |> destructor is a C+-compiler call but can be called by the programmer as-well via (string obj).destructor()
+        ^^ (therefore being able to be called like a normal method)
+
+Priority 6/10 : Adding a variadic system that is type-safe
+    |> planned syntax would be the following:
+        specify<typename T> // generics are never variadic
+        void print(const char *const format, T... args) // T... doesn't mean "everything has type T", it means "everything has a distinct type T"
+        {
+            foreach (arg, args) // this syntax may change as it is still being thought about
+            {
+                // logic
+            }
+        }
+    |> expanded at compile-time and the resulting C code will be specialized (monomorphization for variadics)
+        ^^ (this can lead to code bloat)
