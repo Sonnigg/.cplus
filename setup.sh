@@ -19,7 +19,7 @@ TOOLS="$ROOT/tools"
 
 log_info()
 {
-    printf "[INFO] %s\n" "$1"
+    printf "\033[94m[INFO]\033[0m %s\n" "$1"
 }
 
 log_success()

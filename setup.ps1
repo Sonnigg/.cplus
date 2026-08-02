@@ -37,7 +37,7 @@ function Write-Log {
         [string]$Level = "INFO"
     )
 
-    Write-Host "[$Level] $Message"
+    Write-Host "[$Level] $Message" -ForeGroundColor Blue
 }
 
 function Write-Success {
