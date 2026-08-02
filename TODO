@@ -85,7 +85,7 @@ Priority 8/10 : Adding constexpr support for functions and conditionals as-well 
 
 
 [[
-Priority 5/10 : Adding compiler intrinsics for architecture and OS
+Priority 5/10 : Adding compiler intrinsics for architecture and OS (intrinsic was made for pointer size instead...)
     |> Also adding std::platform() to libc+.hp and making it return a struct "Platform" that has methods .os() and .arch() for the specifics
     |> std::platform().os() will return an std::OS::* instead of a string
     |> std::platform().arch() will return an std::Arch::* instead of a string
@@ -127,3 +127,10 @@ Priority 9/10: Language stabilization
     |> Freeze ABI
     |> Add regression tests
     |> Bootstrap compiler using released C+
+
+Priority 8/10 : Documentation
+    |> Language reference
+    |> Compiler internals
+    |> libc+ reference
+    |> Style guide
+    |> Migration guide
