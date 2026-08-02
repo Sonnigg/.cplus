@@ -44,4 +44,4 @@ namespace std
     typedef ptrsize_t size_t;
 } // namespace std
 
-#endif
+#endif // #ifndef _TYPES_HP
