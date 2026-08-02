@@ -70,9 +70,13 @@ Priority 5/10 : Adding small generic support in C+
     |> and the generic arguments, e.g. add:<int> will be mangled into add__int, add:<int, float> will be mangled
     |> and the output will be add__int__float
 
+
+[[
 Priority 10/10: Splitting the current one-file monstrosity (cplus.c) into multiple smaller more maintable files
     |> this means headers (source/include) and C files (source/src)
     |> the main file is named main.c or main.cplus.c or main-cplus.c, preferably the latter
+]] -> DONE
+
 
 Priority 8/10 : Adding constexpr support for functions and conditionals as-well as for switch to replace #ifdef parts in newer C+
 

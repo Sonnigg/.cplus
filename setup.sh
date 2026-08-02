@@ -9,7 +9,9 @@ set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
-SRC="$ROOT/bootstrap/src/cplus.c"
+MAIN_SRC="$ROOT/bootstrap/main-cplus.c"
+SRC_DIR="$ROOT/bootstrap/src"
+INCLUDE_DIR="$ROOT/bootstrap/include"
 BIN="$ROOT/bin"
 TOOLS="$ROOT/tools"
 
@@ -75,9 +77,19 @@ printf "== C+ Compiler Setup ==\n"
 # Validate source
 # ------------------------------------------------------------
 
-if [ ! -f "$SRC" ]; then
-    log_error "Source file not found: $SRC"
+if [ ! -f "$MAIN_SRC" ]; then
+    log_error "Main source file not found: $MAIN_SRC"
     exit 1
+fi
+
+# Gather source files: main-cplus.c + all .c files in bootstrap/src/
+SRC_FILES="$MAIN_SRC"
+if [ -d "$SRC_DIR" ]; then
+    for file in "$SRC_DIR"/*.c; do
+        if [ -f "$file" ]; then
+            SRC_FILES="$SRC_FILES $file"
+        fi
+    done
 fi
 
 # ------------------------------------------------------------
@@ -213,7 +225,7 @@ do
 
     OUTPUT="$BIN/$NAME"
 
-    if "$TCC" -o "$OUTPUT" "$SRC"; then
+    if "$TCC" -I"$INCLUDE_DIR" -o "$OUTPUT" $SRC_FILES; then
         log_success "Built $OUTPUT"
     else
         log_error "Compilation failed for $NAME"

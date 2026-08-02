@@ -17,7 +17,9 @@ Set-StrictMode -Version Latest
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-$Src = Join-Path $Root "bootstrap\src\cplus.c"
+$MainSrc = Join-Path $Root "bootstrap\main-cplus.c"
+$SrcWildcard = Join-Path $Root "bootstrap\src\*.c"
+$IncludeDir = Join-Path $Root "bootstrap\include"
 $Bin = Join-Path $Root "bin"
 $Tools = Join-Path $Root "tools"
 
@@ -127,8 +129,14 @@ try {
     # Validate source
     # --------------------------------------------------------
 
-    if (-not (Test-Path -LiteralPath $Src -PathType Leaf)) {
-        throw "Source file not found: $Src"
+    if (-not (Test-Path -LiteralPath $MainSrc -PathType Leaf)) {
+        throw "Main source file not found: $MainSrc"
+    }
+
+    $sourceFiles = @($MainSrc)
+    $srcFilesList = Get-ChildItem -Path $SrcWildcard -File -ErrorAction SilentlyContinue
+    foreach ($file in $srcFilesList) {
+        $sourceFiles += $file.FullName
     }
 
     # --------------------------------------------------------
@@ -238,7 +246,7 @@ try {
 
         Write-Log "Building $name..."
 
-        & $TCC -o $output $Src
+        & $TCC "-I$IncludeDir" -o $output @sourceFiles
 
         if ($LASTEXITCODE -ne 0) {
             throw "TCC failed while building $name."
