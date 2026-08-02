@@ -22,7 +22,7 @@ Simply put, **C+ started as my C++ dialect, but grew into its own language**. It
 
 C+ introduces the concept of deferring actions to the low-level languages. This design was heavily inspired by Go's `defer` and also took exactly that form. The new C+ defer (old C+ defer was strictly lexical-bound) will always emit the code inputted to it before every return AND at the end of the lexical scope, meaning you do return before the scope ends (which is normal because return comes before the closing brace), the generated C code will still have the defer code AFTER the return. This does not lead to double-frees, because it would run after a return, therefore is unreachable.
 > Why did I choose 'defer'? Because I didn't know what else to call it.
-> Another note: defer changes its design to be Go-like from the original weird lexical scope design.
+> Another note: defer changed its design to be Go-like from the original weird lexical scope design.
 
 ## Why choose C+?
 Something you might say: "There is no reason as to why you shouldn't just use C++", and I agree with that. But let's be honest, we've all been there when we wanted to use C but just didn't because of all its historical quirks such as no namespaces, and so much more, that's why I made C+, to not carry around C++ baggage and to fix C's old mistakes! You might agree or disagree, but in the end, it's your decision afterall.
