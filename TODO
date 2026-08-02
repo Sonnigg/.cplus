@@ -113,3 +113,10 @@ Priority 6/10 : Adding a variadic system that is type-safe
         }
     |> expanded at compile-time and the resulting C code will be specialized (monomorphization for variadics)
         ^^ (this can lead to code bloat)
+
+Priority 9/10: Language stabilization
+    |> Freeze grammar
+    |> Freeze mangling rules
+    |> Freeze ABI
+    |> Add regression tests
+    |> Bootstrap compiler using released C+
