@@ -80,10 +80,14 @@ Priority 10/10: Splitting the current one-file monstrosity (cplus.c) into multip
 
 Priority 8/10 : Adding constexpr support for functions and conditionals as-well as for switch to replace #ifdef parts in newer C+
 
+
+[[
 Priority 5/10 : Adding compiler intrinsics for architecture and OS
     |> Also adding std::platform() to libc+.hp and making it return a struct "Platform" that has methods .os() and .arch() for the specifics
     |> std::platform().os() will return an std::OS::* instead of a string
     |> std::platform().arch() will return an std::Arch::* instead of a string
+]] -> DONE
+
 
 Priority 8/10 : Adding some form of RAII to C+ and re-implementing defer to be a Go-like defer
     |> planned keyword will be 'destructor' in this form:

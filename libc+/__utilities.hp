@@ -1,3 +1,5 @@
+// __utilities.hp
+
 #include <types>
 
 namespace std
@@ -17,8 +19,8 @@ namespace std
 
     std::size_t _chpLengthPadding(const char *const _chpString)
     {
-        std::size_t total = 1;
+        std::size_t total = 0;
         for (;_chpString[total];total++){}
-        return total;
+        return total+1;
     } // std::size_t std::_chpLengthPadding(const char *const _chpString)
 } // namespace std
