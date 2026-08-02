@@ -1,15 +1,16 @@
 <#
 .SYNOPSIS
-    Bootstraps the C+ compiler using an offline, local TinyCC (TCC) archive.
+    Bootstraps the C+ compiler using an offline TinyCC archive and supports automatic git updates.
 
 .DESCRIPTION
-    Validates source files, resolves a local TCC compiler archive from the
-    'winzips' directory based on architecture, compiles the C+ binaries,
-    and safely updates the user's PATH environment variable.
+    Builds the C+ compiler using a local TCC archive, manages PATH,
+    stores installation metadata, checks GitHub for compiler/libc+
+    updates, and performs git pull and rebuilds upon user confirmation.
 #>
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
 
 # ------------------------------------------------------------
 # Configuration
@@ -20,14 +21,28 @@ $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $MainSrc = Join-Path $Root "bootstrap\main-cplus.c"
 $SrcWildcard = Join-Path $Root "bootstrap\src\*.c"
 $IncludeDir = Join-Path $Root "bootstrap\include"
+
 $Bin = Join-Path $Root "bin"
 $Tools = Join-Path $Root "tools"
+
+$UpdateState = Join-Path $Root ".cplus-update.json"
+
+$CompilerManifest = Join-Path $Root "manifest.json"
+$LibcpManifest = Join-Path $Root "libc+\manifest.json"
+
+$RemoteCompilerManifest =
+    "https://raw.githubusercontent.com/Sonnigg/cplus/main/manifest.json"
+
+$RemoteLibcpManifest =
+    "https://raw.githubusercontent.com/Sonnigg/cplus/main/libc%2B/manifest.json"
+
 
 $Executables = @(
     "cplus.exe",
     "c+.exe",
     "cc+.exe"
 )
+
 
 # ------------------------------------------------------------
 # Logging
@@ -39,8 +54,9 @@ function Write-Log {
         [string]$Level = "INFO"
     )
 
-    Write-Host "[$Level] $Message" -ForeGroundColor Blue
+    Write-Host "[$Level] $Message" -ForegroundColor Blue
 }
+
 
 function Write-Success {
     param(
@@ -50,6 +66,7 @@ function Write-Success {
     Write-Host "[SUCCESS] $Message" -ForegroundColor Green
 }
 
+
 function Write-ErrorLog {
     param(
         [string]$Message
@@ -58,226 +75,442 @@ function Write-ErrorLog {
     Write-Host "[ERROR] $Message" -ForegroundColor Red
 }
 
+
+# ------------------------------------------------------------
+# Manifest Handling
+# ------------------------------------------------------------
+
+function Get-LocalVersion {
+
+    if (
+        -not (Test-Path $CompilerManifest) -or
+        -not (Test-Path $LibcpManifest)
+    ) {
+        return $null
+    }
+
+
+    $compiler =
+        Get-Content $CompilerManifest -Raw |
+        ConvertFrom-Json
+
+
+    $libcp =
+        Get-Content $LibcpManifest -Raw |
+        ConvertFrom-Json
+
+
+    return @{
+        compiler = $compiler.version
+        libcp = $libcp.version
+    }
+}
+
+
+function Get-RemoteVersion {
+
+    param(
+        [Parameter(Mandatory)]
+        [string]$Url
+    )
+
+
+    try {
+
+        $manifest =
+            Invoke-RestMethod `
+                -Uri $Url `
+                -UseBasicParsing
+
+
+        return $manifest.version
+
+    }
+    catch {
+
+        return $null
+
+    }
+}
+
+
+# ------------------------------------------------------------
+# Update Checking & Git Pull
+# ------------------------------------------------------------
+
+function Save-UpdateState {
+
+    param(
+        [string]$Compiler,
+        [string]$Libcp
+    )
+
+
+    @{
+        compiler = $Compiler
+        libcp = $Libcp
+        lastCheck = (Get-Date).ToUniversalTime()
+    }
+    |
+    ConvertTo-Json
+    |
+    Set-Content $UpdateState
+}
+
+
+function Check-ForUpdates {
+
+    if (-not (Test-Path $UpdateState)) {
+        return $false
+    }
+
+
+    $state =
+        Get-Content $UpdateState -Raw |
+        ConvertFrom-Json
+
+
+    $lastCheck =
+        [DateTime]$state.lastCheck
+
+
+    if (
+        ((Get-Date).ToUniversalTime() - $lastCheck).TotalHours -lt 24
+    ) {
+        return $false
+    }
+
+
+    Write-Log "Checking for C+ updates..."
+
+
+    $latestCompiler =
+        Get-RemoteVersion $RemoteCompilerManifest
+
+
+    $latestLibcp =
+        Get-RemoteVersion $RemoteLibcpManifest
+
+
+    if (
+        $null -eq $latestCompiler -or
+        $null -eq $latestLibcp
+    ) {
+        return $false
+    }
+
+
+    $changed = $false
+
+
+    if ($latestCompiler -ne $state.compiler) {
+
+        Write-Host ""
+        Write-Host "Compiler update available!" `
+            -ForegroundColor Yellow
+
+        Write-Host "Installed: $($state.compiler)"
+        Write-Host "Latest:    $latestCompiler"
+
+        $changed = $true
+    }
+
+
+    if ($latestLibcp -ne $state.libcp) {
+
+        Write-Host ""
+        Write-Host "libc+ update available!" `
+            -ForegroundColor Yellow
+
+        Write-Host "Installed: $($state.libcp)"
+        Write-Host "Latest:    $latestLibcp"
+
+        $changed = $true
+    }
+
+
+    $shouldRebuild = $false
+
+    if ($changed) {
+
+        Write-Host ""
+
+        $answer =
+            Read-Host "Update now? [Y/n]"
+
+
+        if (
+            $answer -eq "" -or
+            $answer -match "^[Yy]"
+        ) {
+
+            Write-Log "Pulling latest updates via git..."
+
+            $git = Get-Command git -ErrorAction SilentlyContinue
+            if ($null -eq $git) {
+                Write-ErrorLog "Git is not installed or not found in PATH. Cannot perform automatic update."
+            } else {
+                Push-Location $Root
+                try {
+                    & git pull
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "git pull exited with code $LASTEXITCODE"
+                    }
+                    Write-Success "Repository updated successfully."
+                    $shouldRebuild = $true
+                }
+                catch {
+                    Write-ErrorLog "Git pull failed: $_"
+                }
+                finally {
+                    Pop-Location
+                }
+            }
+        }
+    }
+
+
+    Save-UpdateState `
+        -Compiler $latestCompiler `
+        -Libcp $latestLibcp
+
+    return $shouldRebuild
+}
+
+
 # ------------------------------------------------------------
 # PATH Handling
 # ------------------------------------------------------------
 
 function Add-ToUserPath {
+
     param(
         [Parameter(Mandatory)]
         [string]$Directory
     )
 
-    $Directory = [System.IO.Path]::GetFullPath($Directory).TrimEnd('\')
 
-    $userPath = [Environment]::GetEnvironmentVariable(
-        "Path",
-        [EnvironmentVariableTarget]::User
-    )
+    $Directory =
+        [System.IO.Path]::GetFullPath($Directory)
+            .TrimEnd("\")
+
+
+    $userPath =
+        [Environment]::GetEnvironmentVariable(
+            "Path",
+            [EnvironmentVariableTarget]::User
+        )
+
 
     if (-not $userPath) {
         $userPath = ""
     }
 
-    $entries = @(
-        $userPath -split ";" |
-        ForEach-Object { $_.Trim() } |
-        Where-Object { $_ -ne "" }
-    )
 
-    $exists = $entries | Where-Object {
-        $_.TrimEnd('\') -ieq $Directory
-    }
+    $entries =
+        @(
+            $userPath -split ";" |
+            Where-Object {
+                $_.Trim() -ne ""
+            }
+        )
 
-    if ($exists) {
-        Write-Log "Already in User PATH: $Directory"
+
+    if (
+        $entries |
+        Where-Object {
+            $_.TrimEnd("\") -ieq $Directory
+        }
+    ) {
+
+        Write-Log "Already in PATH: $Directory"
         return
     }
 
+
     $entries += $Directory
 
-    $newPath = $entries -join ";"
 
     [Environment]::SetEnvironmentVariable(
         "Path",
-        $newPath,
+        ($entries -join ";"),
         [EnvironmentVariableTarget]::User
     )
 
-    # Update current PowerShell session
-    $currentEntries = @(
-        $env:Path -split ";" |
-        Where-Object { $_.Trim() -ne "" }
-    )
 
-    $currentEntries += $Directory
+    $env:Path =
+        ($env:Path -split ";" + $Directory) -join ";"
 
-    $env:Path = $currentEntries -join ";"
 
-    Write-Log "Added to User PATH: $Directory"
+    Write-Log "Added PATH: $Directory"
 }
 
+
 # ------------------------------------------------------------
-# Main
+# Build Logic
 # ------------------------------------------------------------
 
-try {
+function Invoke-CPlusBuild {
 
-    Write-Log "Starting C+ compiler setup..." "BOOTSTRAP"
-
-    # --------------------------------------------------------
-    # Validate source
-    # --------------------------------------------------------
-
-    if (-not (Test-Path -LiteralPath $MainSrc -PathType Leaf)) {
-        throw "Main source file not found: $MainSrc"
+    if (-not (Test-Path $MainSrc)) {
+        throw "Missing source: $MainSrc"
     }
 
-    $sourceFiles = @($MainSrc)
-    $srcFilesList = Get-ChildItem -Path $SrcWildcard -File -ErrorAction SilentlyContinue
-    foreach ($file in $srcFilesList) {
-        $sourceFiles += $file.FullName
+
+    $sources = @($MainSrc)
+
+
+    Get-ChildItem $SrcWildcard -File |
+    ForEach-Object {
+        $sources += $_.FullName
     }
 
-    # --------------------------------------------------------
-    # Find TCC
-    # --------------------------------------------------------
 
-    $tccCommand = Get-Command tcc -ErrorAction SilentlyContinue
+    $tcc =
+        Get-Command tcc -ErrorAction SilentlyContinue
 
-    if ($null -ne $tccCommand) {
 
-        $TCC = $tccCommand.Source
-        $TCCDir = Split-Path -Parent $TCC
+    if ($null -ne $tcc) {
+
+        $TCC = $tcc.Source
+        $TCCDir = Split-Path $TCC
 
         Write-Success "Found TCC: $TCC"
 
-    } else {
+    }
 
-        Write-Log "TCC not found. Searching local archive..."
+    else {
 
-        $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+        Write-Log "Searching local TCC archive..."
 
-        switch ($arch) {
 
-            "X64" {
-                $zipFilter = "*64*.zip"
+        $arch =
+            [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+
+
+        $filter =
+            switch ($arch) {
+
+                X64 { "*64*.zip" }
+                X86 { "*32*.zip" }
+
+                default {
+                    throw "Unsupported architecture."
+                }
             }
 
-            "X86" {
-                $zipFilter = "*32*.zip"
-            }
 
-            default {
-                throw "Unsupported architecture: $arch"
-            }
-        }
-
-        $WinZipDir = Join-Path $Root "winzips"
-
-        if (-not (Test-Path $WinZipDir)) {
-            throw "Missing winzips directory: $WinZipDir"
-        }
-
-        $archives = @(
+        $zip =
             Get-ChildItem `
-                -Path $WinZipDir `
-                -Filter $zipFilter `
-                -File `
-                -ErrorAction SilentlyContinue
-        )
-
-        if ($archives.Count -eq 0) {
-            throw "No TCC archive found matching: $zipFilter"
-        }
-
-        $archive = $archives[0].FullName
-
-        New-Item `
-            -ItemType Directory `
-            -Force `
-            -Path $Tools |
-            Out-Null
-
-        if (Test-Path "$Tools\tcc") {
-            Remove-Item `
-                -Recurse `
-                -Force `
-                "$Tools\tcc"
-        }
-
-        Write-Log "Extracting: $archive"
-
-        Expand-Archive `
-            -LiteralPath $archive `
-            -DestinationPath $Tools `
-            -Force
-
-        $tccExe = Get-ChildItem `
-            -Path $Tools `
-            -Filter "tcc.exe" `
-            -Recurse |
+                (Join-Path $Root "winzips") `
+                -Filter $filter |
             Select-Object -First 1
 
-        if ($null -eq $tccExe) {
-            throw "Could not locate tcc.exe after extraction."
+
+        if ($null -eq $zip) {
+            throw "No TCC archive found."
         }
 
-        $TCC = $tccExe.FullName
-        $TCCDir = $tccExe.DirectoryName
 
-        Write-Success "Installed local TCC: $TCC"
+        Expand-Archive `
+            $zip.FullName `
+            $Tools `
+            -Force
+
+
+        $TCCExe =
+            Get-ChildItem `
+                $Tools `
+                -Filter tcc.exe `
+                -Recurse |
+            Select-Object -First 1
+
+
+        if ($null -eq $TCCExe) {
+            throw "Could not find extracted TCC."
+        }
+
+
+        $TCC = $TCCExe.FullName
+        $TCCDir = $TCCExe.DirectoryName
+
     }
 
-    # --------------------------------------------------------
-    # Prepare directories
-    # --------------------------------------------------------
 
-    New-Item -ItemType Directory -Force -Path $Bin | Out-Null
-    New-Item -ItemType Directory -Force -Path $Tools | Out-Null
 
-    # --------------------------------------------------------
-    # Build compiler
-    # --------------------------------------------------------
+    New-Item `
+        -ItemType Directory `
+        -Force `
+        $Bin `
+    | Out-Null
 
-    foreach ($name in $Executables) {
 
-        $output = Join-Path $Bin $name
 
-        Write-Log "Building $name..."
+    foreach ($exe in $Executables) {
 
-        & $TCC "-I$IncludeDir" -o $output @sourceFiles
+        $output =
+            Join-Path $Bin $exe
+
+
+        Write-Log "Building $exe..."
+
+
+        & $TCC `
+            "-I$IncludeDir" `
+            -o $output `
+            @sources
+
 
         if ($LASTEXITCODE -ne 0) {
-            throw "TCC failed while building $name."
+            throw "Compilation failed."
         }
 
-        Write-Success "Built: $output"
     }
 
-    # --------------------------------------------------------
-    # PATH
-    # --------------------------------------------------------
+
+
+    $versions = Get-LocalVersion
+
+
+    if ($null -ne $versions) {
+
+        Save-UpdateState `
+            $versions.compiler `
+            $versions.libcp
+    }
+
+
 
     Add-ToUserPath $Bin
     Add-ToUserPath $Tools
     Add-ToUserPath $TCCDir
 
-    Write-Host ""
+}
 
-    Write-Success "C+ compiler successfully built."
 
-    Write-Host ""
-    Write-Host "Available commands:"
-    Write-Host "  cplus"
-    Write-Host "  c+"
-    Write-Host "  cc+"
-    Write-Host "  tcc"
+# ------------------------------------------------------------
+# Execution Flow
+# ------------------------------------------------------------
 
-    Write-Host ""
-    Write-Host "New terminals will inherit the updated PATH."
+try {
+
+    Write-Log "Starting C+ bootstrap..." "BOOTSTRAP"
+
+
+    $performRebuild = Check-ForUpdates
+
+
+    if ($performRebuild -or -not (Test-Path (Join-Path $Bin "cplus.exe"))) {
+        Invoke-CPlusBuild
+    } else {
+        Write-Log "No rebuild needed."
+    }
+
+
+    Write-Success "C+ successfully installed/updated."
 
 }
+
 catch {
 
     Write-ErrorLog $_.Exception.Message
