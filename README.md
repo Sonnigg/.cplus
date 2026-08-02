@@ -66,5 +66,7 @@ int main()
 }
 ```
 
+More code examples can be found in the [Example folder](./examples/), such as [hellp.cp](./examples/hello.cp) or [methods.cp](./examples/methods.cp)!
+
 ## Any questions?
 Maybe your question can be answered by the official C+ specification? Give it a shot and dive into [spec-c+](./spec-c+.md).
