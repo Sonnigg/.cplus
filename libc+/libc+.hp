@@ -16,6 +16,69 @@ namespace std
     #endif
     typedef ptrsize_t size_t;
 
+    enum OS
+    {
+        Windows,
+        Linux,
+        MacOS,
+        FreeBSD,
+        OpenBSD,
+        NetBSD,
+        Android,
+        IOS,
+        Unknown
+    }
+
+    enum Arch
+    {
+        X86,
+        X86_64,
+        AArch64,
+        ARM,
+        RISCV32,
+        RISCV64,
+        LoongArch64,
+        PPC64,
+        S390X,
+        Wasm32,
+        Wasm64,
+        Unknown
+    }
+    
+    enum Endian
+    {
+        Little,
+        Big
+    }
+
+    struct Platform
+    {
+        std::OS __os;
+        std::Arch __arch;
+        std::Endian __endian;
+        std::size_t __ptr_size;
+
+        std::OS os(Platform *self)
+        {
+            return self->__os;
+        }
+
+        std::Arch arch(Platform *self)
+        {
+            return self->__arch;
+        }
+
+        std::Endian endian(Platform *self)
+        {
+            return self->__endian;
+        }
+
+        std::size_t ptr_size(Platform *self)
+        {
+            return self->__ptr_size;
+        }
+    }
+
 /*
 
     HELPERS
@@ -66,6 +129,116 @@ namespace std
     {
         std::write_stdout("Hello World!", 12 /* because lengthWithNull - 1 */);
     } // void std::hello()
+
+    std::Platform platform()
+    {
+        std::Platform p;
+
+        /* ---------------- OS ---------------- */
+
+    #if defined(_WIN32) || defined(_WIN64)
+        p.__os = std::Windows;
+
+    #elif defined(__ANDROID__)
+        p.__os = std::Android;
+
+    #elif defined(__APPLE__)
+        #if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+            p.__os = std::IOS;
+        #else
+            p.__os = std::MacOS;
+        #endif
+
+    #elif defined(__linux__)
+        p.__os = std::Linux;
+
+    #elif defined(__FreeBSD__)
+        p.__os = std::FreeBSD;
+
+    #elif defined(__OpenBSD__)
+        p.__os = std::OpenBSD;
+
+    #elif defined(__NetBSD__)
+        p.__os = std::NetBSD;
+
+    #else
+        p.__os = std::Unknown;
+    #endif
+
+
+        /* -------------- Architecture -------------- */
+
+    #if defined(__x86_64__) || defined(_M_X64)
+        p.__arch = std::X86_64;
+
+    #elif defined(__i386__) || defined(_M_IX86)
+        p.__arch = std::X86;
+
+    #elif defined(__aarch64__) || defined(_M_ARM64)
+        p.__arch = std::AArch64;
+
+    #elif defined(__arm__) || defined(_M_ARM)
+        p.__arch = std::ARM;
+
+    #elif defined(__riscv) && (__riscv_xlen == 64)
+        p.__arch = std::RISCV64;
+
+    #elif defined(__riscv) && (__riscv_xlen == 32)
+        p.__arch = std::RISCV32;
+
+    #elif defined(__loongarch64)
+        p.__arch = std::LoongArch64;
+
+    #elif defined(__powerpc64__)
+        p.__arch = std::PPC64;
+
+    #elif defined(__s390x__)
+        p.__arch = std::S390X;
+
+    #elif defined(__wasm64__)
+        p.__arch = std::Wasm64;
+
+    #elif defined(__wasm32__)
+        p.__arch = std::Wasm32;
+
+    #else
+        p.__arch = std::Unknown;
+    #endif
+
+
+        /* ---------------- Endianness ---------------- */
+
+    #if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && defined(__ORDER_BIG_ENDIAN__)
+
+        #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+            p.__endian = std::Little;
+        #else
+            p.__endian = std::Big;
+        #endif
+
+    #elif defined(_WIN32)
+
+        /* Windows only targets little-endian architectures. */
+        p.__endian = std::Little;
+
+    #else
+
+        /* Fallback: runtime detection */
+        {
+            unsigned int value = 1;
+
+            if (*(unsigned char *)&value)
+                p.__endian = std::Little;
+            else
+                p.__endian = std::Big;
+        }
+
+    #endif
+
+        p.__ptr_size = sizeof(void *);
+
+        return p;
+    }
 }
 
 #endif // #ifndef _LIBCP_HP
