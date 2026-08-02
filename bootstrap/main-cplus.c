@@ -8,6 +8,9 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <time.h>
+#include <dirent.h>
+#include <fnmatch.h>
+#include <sys/stat.h>
 #endif
 
 bool ALLOW_WARNINGS = true;
@@ -124,6 +127,107 @@ static int run_process(Arguments *a)
     return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
 }
 #endif
+
+/* --- PLATFORM-SPECIFIC GLOBBING IMPLEMENTATION --- */
+static void add_globbed_argument(Arguments *dst, const char *pattern)
+{
+    // Check if the pattern contains a wildcard
+    if (!strchr(pattern, '*') && !strchr(pattern, '?')) {
+        args_push(dst, pattern);
+        return;
+    }
+
+#ifdef _WIN32
+    // Extract directory portion and file pattern portion
+    char dir_path[MAX_PATH];
+    const char *last_slash = strrchr(pattern, '/');
+    const char *last_backslash = strrchr(pattern, '\\');
+    const char *slash = last_slash > last_backslash ? last_slash : last_backslash;
+
+    size_t dir_len = 0;
+    if (slash) {
+        dir_len = (size_t)(slash - pattern + 1);
+        if (dir_len >= sizeof(dir_path)) dir_len = sizeof(dir_path) - 1;
+        memcpy(dir_path, pattern, dir_len);
+        dir_path[dir_len] = '\0';
+    } else {
+        strcpy_s(dir_path, sizeof(dir_path), ".\\");
+    }
+
+    WIN32_FIND_DATAA find_data;
+    HANDLE h_find = FindFirstFileA(pattern, &find_data);
+    if (h_find == INVALID_HANDLE_VALUE) {
+        // If no match found, push literal pattern so downstream code reports the exact error
+        args_push(dst, pattern);
+        return;
+    }
+
+    bool matched = false;
+    do {
+        if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            char full_path[MAX_PATH];
+            if (slash) {
+                snprintf(full_path, sizeof(full_path), "%.*s%s", (int)dir_len, pattern, find_data.cFileName);
+            } else {
+                snprintf(full_path, sizeof(full_path), "%s", find_data.cFileName);
+            }
+            // Normalize path separators if needed or keep consistent
+            args_push(dst, full_path);
+            matched = true;
+        }
+    } while (FindNextFileA(h_find, &find_data));
+    FindClose(h_find);
+
+    if (!matched) {
+        args_push(dst, pattern);
+    }
+#else
+    // POSIX Globbing implementation
+    char dir_path[1024];
+    const char *slash = strrchr(pattern, '/');
+    const char *file_pattern = slash ? slash + 1 : pattern;
+
+    if (slash) {
+        size_t len = (size_t)(slash - pattern);
+        if (len >= sizeof(dir_path)) len = sizeof(dir_path) - 1;
+        memcpy(dir_path, pattern, len);
+        dir_path[len] = '\0';
+    } else {
+        strcpy(dir_path, ".");
+    }
+
+    DIR *d = opendir(dir_path);
+    if (!d) {
+        args_push(dst, pattern);
+        return;
+    }
+
+    bool matched = false;
+    struct dirent *dir;
+    while ((dir = readdir(d)) != NULL) {
+        if (fnmatch(file_pattern, dir->d_name, 0) == 0) {
+            char full_path[2048];
+            if (slash) {
+                snprintf(full_path, sizeof(full_path), "%.*s/%s", (int)(slash - pattern), pattern, dir->d_name);
+            } else {
+                snprintf(full_path, sizeof(full_path), "%s", dir->d_name);
+            }
+            
+            // Ensure it's a regular file or symlink to file, not a subdirectory matching the pattern
+            struct stat st;
+            if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
+                args_push(dst, full_path);
+                matched = true;
+            }
+        }
+    }
+    closedir(d);
+
+    if (!matched) {
+        args_push(dst, pattern);
+    }
+#endif
+}
 
 static bool extract_json_value(const char *json, const char *key, char *dest, size_t dest_size) {
     char search_pattern[128];
@@ -278,7 +382,6 @@ int main(int argc, char **argv)
     double total_start = timer_now();
     double preprocess_time = 0.0, lex_time = 0.0, transpile_time = 0.0, backend_time = 0.0;
     
-    // We start line metrics at 0, incremented during file reading
     size_t source_lines = 0, source_bytes = 0, token_count = 0, generated_lines = 0, generated_bytes = 0;
 
     if (argc < 2) { usage(); return 1; }
@@ -301,7 +404,12 @@ int main(int argc, char **argv)
         if (!endopt && !strcmp(a, "--keep-c")) { keep = true; continue; }
         if (!endopt && !strcmp(a, "--index")) { index = true; continue; }
         if (!endopt && !strcmp(a, "--notify")) { notify = true; continue; }
-        if (!endopt && a[0] != '-') { args_push(&inputs, a); continue; }
+        
+        if (!endopt && a[0] != '-') {
+            // Automatically expand globs/wildcards on input arguments
+            add_globbed_argument(&inputs, a);
+            continue;
+        }
         args_push(&backend, a);
     }
 
@@ -362,7 +470,7 @@ int main(int argc, char **argv)
             emit_ide_index(&toks); 
             tokens_free(&toks); 
             free(source); 
-            continue; // Move to next file if indexing
+            continue;
         }
 
         double transpile_start = timer_now();
@@ -383,7 +491,7 @@ int main(int argc, char **argv)
         generated_lines += g_lines;
 
         char *generated_tmp = generated_name(input_file);
-        args_push(&generated_files, generated_tmp); // Copies it into the array
+        args_push(&generated_files, generated_tmp);
         
         FILE *f = fopen(generated_tmp, "wb");
         if (!f) die("could not create generated C file");
@@ -417,16 +525,13 @@ int main(int argc, char **argv)
     args_push(&command, "tcc");
     args_push(&command, "-w");
     
-    // Add forwarded backend args (like -I, -D, -c)
     for (i = 0; i < (int)backend.count; i++) args_push(&command, backend.items[i]);
     
-    // Target output executable/object if supplied or deduced
     if (output) {
         args_push(&command, "-o");
         args_push(&command, output);
     }
     
-    // Add all generated C files
     for (i = 0; i < (int)generated_files.count; i++) {
         args_push(&command, generated_files.items[i]);
     }
@@ -436,7 +541,6 @@ int main(int argc, char **argv)
 
     if (stats) print_stats(source_lines, source_bytes, token_count, generated_lines, generated_bytes, preprocess_time, lex_time, transpile_time, backend_time, timer_now() - total_start);
     
-    /* --- POST COMPILATION CLEANUP --- */
     for (i = 0; i < (int)generated_files.count; i++) {
         if (status == 0 && !keep) remove(generated_files.items[i]);
     }
