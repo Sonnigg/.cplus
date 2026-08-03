@@ -1,0 +1,31 @@
+// limits.hp
+
+#ifndef _LIMITS_HP
+#define _LIMITS_HP
+
+#include <types>
+
+namespace std
+{
+    /* Unsigned integer max */
+    const std::uint8_t  uint8_max  = 255;                     // 256 - 1
+    const std::uint16_t uint16_max = 65535;                   // 65536 - 1
+    const std::uint32_t uint32_max = 4294967295;              // 4294967296 - 1
+    const std::uint64_t uint64_max = 18446744073709551615;    // 18446744073709551616 - 1
+    // Unsigned range is: [0, max]
+
+    /* Signed integer max */
+    const std::int8_t   int8_max   = 127;                     // 128 - 1
+    const std::int16_t  int16_max  = 32767;                   // 32768 - 1
+    const std::int32_t  int32_max  = 2147483647;              // 2147483648 - 1
+    const std::int64_t  int64_max  = 9223372036854775807;     // 9223372036854775808 - 1
+
+    /* Signed integer min */
+    const std::int8_t   int8_min   = -std::int8_max  - 1;
+    const std::int16_t  int16_min  = -std::int16_max - 1;
+    const std::int32_t  int32_min  = -std::int32_max - 1;
+    const std::int64_t  int64_min  = -std::int64_max - 1;
+    // Signed range is: [-max - 1, max]
+}
+
+#endif
