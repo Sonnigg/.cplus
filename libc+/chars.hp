@@ -41,6 +41,58 @@ namespace std
         }
     }
 
+    bool isOnlyDigit(const char *const _chpString)
+    {
+        for (std::size_t i = 0; _chpString[i]; i++)
+        {
+            if (!std::isDigit(_chpString[i]))
+                return false;
+        }
+        return true;
+    }
+
+    bool isBinaryDigit(const char _chChar)
+    {
+        switch (_chChar)
+        {
+            case '0' || '1':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool isOnlyBinaryDigit(const char *const _chpString)
+    {
+        for (std::size_t i = 0; _chpString[i]; i++)
+        {
+            if (!std::isBinaryDigit(_chpString[i]))
+                return false;
+        }
+        return true;
+    }
+
+    bool isHexDigit(const char _chChar)
+    {
+        switch (_chChar)
+        {
+            case std::isDigit(_) || 'a' ==> 'f' || 'A' ==> 'F':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool isOnlyHexDigit(const char *const _chpString)
+    {
+        for (std::size_t i = 0; _chpString[i]; i++)
+        {
+            if (!std::isHexDigit(_chpString[i]))
+                return false;
+        }
+        return true;
+    }
+
     bool isAlpha(const char _chChar)
     {
         switch (_chChar)
@@ -52,9 +104,82 @@ namespace std
         }
     }
 
+    bool isOnlyAlpha(const char *const _chpString)
+    {
+        for (std::size_t i = 0; _chpString[i]; i++)
+        {
+            if (!std::isAlpha(_chpString[i]))
+                return false;
+        }
+        return true;
+    }
+
     bool isAlnum(const char _chChar)
     {
         return std::isDigit(_chChar) || std::isAlpha(_chChar);
+    }
+
+    bool isOnlyAlnum(const char *const _chpString)
+    {
+        for (std::size_t i = 0; _chpString[i]; i++)
+        {
+            if (!std::isAlnum(_chpString[i]))
+                return false;
+        }
+        return true;
+    }
+
+    bool isUpper(const char _chChar)
+    {
+        switch (_chChar)
+        {
+            case 'A' ==> 'Z':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool isOnlyUpper(const char *const _chpString)
+    {
+        for (std::size_t i = 0; _chpString[i]; i++)
+        {
+            if (!std::isUpper(_chpString[i]))
+                return false;
+        }
+        return true;
+    }
+
+    bool isLower(const char _chChar)
+    {
+        switch (_chChar)
+        {
+            case 'a' ==> 'z':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool isOnlyLower(const char *const _chpString)
+    {
+        for (std::size_t i = 0; _chpString[i]; i++)
+        {
+            if (!std::isLower(_chpString[i]))
+                return false;
+        }
+        return true;
+    }
+
+    bool isPunctuation(const char _chChar)
+    {
+        switch (_chChar)
+        {
+            case '.' || ',' || ';' || ':' || '?' || '!':
+                return true;
+            default:
+                return false;
+        }
     }
 }
 

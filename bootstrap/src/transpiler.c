@@ -885,13 +885,17 @@ static void emit_fragment_with_substitution(Transpiler *t, NamespaceStack *ns, s
     size_t p = begin;
     while (p < end) {
         Token *x = at(t, p);
-        if (x->kind == TOK_IDENTIFIER && x->length == 1 && x->begin[0] == '_') {
+        
+        /* Intercept the predicate placeholder */
+        if (x->kind == TOK_IDENTIFIER && token_is(x, "_")) {
             emit_ws(&t->output, x);
             buffer_puts(&t->output, "__switch_value");
+            ++p;
         } else {
-            emit_full(&t->output, x);
+            /* Delegate to the main transpiler loop to properly resolve namespaces, 
+               structs, variables, and function calls */
+            emit_one(t, ns, &p, end);
         }
-        ++p;
     }
 }
 
