@@ -109,7 +109,7 @@ The precedence is as follows:
 
         predicate functions
 
-        _
+        _ (underscore)
 
         literal equality
 
