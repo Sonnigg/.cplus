@@ -216,7 +216,7 @@ anonymous enum with typedef
 ```cx
 typedef enum
 {
-    int thing;
+    thing
 } Thing;
 ```
 > Note that the compiler will fail if you use a non-anonymous enum with typedef in C+.
