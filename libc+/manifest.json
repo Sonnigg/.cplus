@@ -1,3 +1,7 @@
 {
+    "name": [
+        "libc+",
+        "libcp"
+    ],
     "version": "0.0.9"
 }
