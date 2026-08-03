@@ -1,3 +1,16 @@
+# DATE TABLE (YYYY-MM-DD)
+| Feature                         | Added      | Last Modified |
+|---------------------------------|------------|---------------|
+| STATUS                          | 2026-08-01 | 2026-08-01    |
+| CMPL__PTR_SIZE                  | 2026-08-03 | 2026-08-03    |
+| switch                          | 2026-08-03 | 2026-08-03    |
+| switch::precedence              | 2026-08-03 | 2026-08-03    |
+| switch::corner_cases            | 2026-08-03 | 2026-08-03    |
+| structs                         | 2026-08-03 | 2026-08-03    |
+| structs::methods                | 2026-08-03 | 2026-08-03    |
+| enums                           | 2026-08-03 | 2026-08-03    |
+| enums::variants                 | 2026-08-03 | 2026-08-03    |
+
 # STATUS - WIP (1st August 2026)
 
 # Information regarding "(DATE)" (3rd August 2026)
@@ -120,3 +133,125 @@ The precedence is as follows:
         ||
 
     Lowest
+
+### Regarding corner cases (3rd August 2026)
+C+'s switch is a first-to-match-wins switch, that means whatever case matches first will be executed, therefore all other code afterwards is unreachable.
+`default` is only allowed at the end of a switch statement and is an optional case (functions the same as `case _:`). Whenever `case _:` is used, every other branch after it becomes unreachable.
+
+> Note that `case _:` becomes `if (__switch_value == __switch_value) { ... }`, aka `if (true) { ... }`.
+
+
+## About C+'s structs (3rd August 2026)
+A C+ struct can be declared the same way a C struct is declared, though there are 3, and only 3, different ways of declaring a struct in C+.
+
+anonymous struct with typedef
+```cx
+typedef struct
+{
+    int thing;
+} Thing;
+```
+> Note that the compiler will fail if you use a non-anonymous struct with typedef in C+.
+
+named struct with semicolon after the closing brace
+```cx
+struct Thing
+{
+    int thing;
+};
+```
+> Note that C+ automatically emits a typedef for all structs and enums, therefore `struct Thing` will be lowered into a typedef.
+
+named struct without semicolon after the closing brace
+```cx
+struct Thing
+{
+    int thing;
+}
+```
+> Note that the semicolon is optional as the C+ compiler will automatically add a semicolon if it's missing.
+
+A struct can contain both fields and methods. C+ defines a method differently than a C++ method on objects. A method is either a static or non-static method, and depending on that, its behaviour slightly changes. A static method requires the `static` keyword and has no other requirement. A non-static method requires the first parameter to be a pointer to its struct (its struct referring to the struct the method is under).
+
+static and non-static method example
+```cx
+struct Thing
+{
+    int thing;
+
+    static Thing new()
+    {
+        return Thing {
+            thing: 0,
+        };
+    }
+
+    void set(Thing *self, int t)
+    {
+        self->thing = t;
+    }
+}
+```
+> The first parameter's name doesn't have any restrictions on what it has to be named, that is entirely up to the programmer.
+
+Methods are called depending on if they are static or not. If the method (assuming a type called T) being called is declared `static`, it can only be called via T::method_name(arguments), though if it were a non-static method, it can only be called via object.method_name(arguments_except_first_parameter).
+
+static and non-static method call example
+```cx
+// assuming the above-made struct exists in this codebase for this example
+
+int main()
+{
+    Thing t = Thing::new(); // static method call following T::method_name(arguments), though new doesn't expect any arguments
+    t.set(2);               // non-static method call following object.method_name(arguments_except_first_parameter)
+    return 0;
+}
+```
+> t.set(2) automatically promotes 't' to a pointer, unless it already is a pointer of depth 1 or more, then it keeps the pointer depth the same, meaning if t was declared `Thing **`, set would receive set(t, 2) aka set(Thing **, int) even though the function was defined as set(Thing *, int).
+
+## About C+'s enums (3rd August 2026)
+A C+ enum can be declared the same way a C enum is declared, though there are 3, and only 3, different ways of declaring a enum in C+.
+
+anonymous enum with typedef
+```cx
+typedef enum
+{
+    int thing;
+} Thing;
+```
+> Note that the compiler will fail if you use a non-anonymous enum with typedef in C+.
+
+named enum with semicolon after the closing brace
+```cx
+enum Thing
+{
+    thing
+};
+```
+> Note that C+ automatically emits a typedef for all structs and enums, therefore `enum Thing` will be lowered into a typedef.
+
+named enum without semicolon after the closing brace
+```cx
+enum Thing
+{
+    thing
+}
+```
+> Note that the semicolon is optional as the C+ compiler will automatically add a semicolon if it's missing.
+
+An enum can only contain so-called "enumerands" or "variants" and an enum in C+ is always scoped. Ultimately a C+ enum is the same as a C enum, different words for numbers, therefore C+ does not have algebraic data types (sum types, Rust enum). When lowering C+ to C, `Thing::thing` (assuming it being a valid variant in the enum `Thing`) will be lowered to Thing_thing. C+ enums let you access their variants through the static-struct or namespace access.
+
+accessing a variant of an enum
+```cx
+enum Thing
+{
+    thing1,
+    thing2,
+}
+
+int main()
+{
+    Thing::thing1;
+}
+```
+> Thing::thing1 would be 0, though this can be overriden by using VARIANT = INTEGER instead.
