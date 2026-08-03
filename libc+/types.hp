@@ -13,15 +13,14 @@ namespace std
     typedef unsigned int        uint32_t; // max: 2^32 - 1
     typedef unsigned long long  uint64_t; // max: 2^64 - 1
 
-    typedef signed char         int8_t;   // min: 2^7 , max: 2^7  - 1
-    typedef signed short        int16_t;  // min: 2^15, max: 2^15 - 1
-    typedef signed int          int32_t;  // min: 2^31, max: 2^31 - 1
-    typedef signed long long    int64_t;  // min: 2^63, max: 2^63 - 1
+    typedef signed char         int8_t;   // min: -(2^7 ), max: 2^7  - 1
+    typedef signed short        int16_t;  // min: -(2^15), max: 2^15 - 1
+    typedef signed int          int32_t;  // min: -(2^31), max: 2^31 - 1
+    typedef signed long long    int64_t;  // min: -(2^63), max: 2^63 - 1
 
     /*
         Pointer-sized types
     */
-    char UNSUPPORTED_PTR = '\0';
 #if CMPL__PTR_SIZE == 8
     typedef uint64_t ptrsize_t;
     typedef int64_t  sptrsize_t;
@@ -31,16 +30,9 @@ namespace std
     typedef int32_t  sptrsize_t;
 
 #elif CMPL__PTR_SIZE == 2
+    // this shouldn't happen though, since CMPL__PTR_SIZE is either 8 (64 bit targets) or 4 (32 bit targets), otherwise always fall back to 2 (16 bit targets)
     typedef uint16_t ptrsize_t;
     typedef int16_t  sptrsize_t;
-
-#elif CMPL__PTR_SIZE == 1
-    typedef uint8_t ptrsize_t;
-    typedef int8_t  sptrsize_t;
-
-#else
-    // will stop compilation if there's an UNSUPPORTED_PTR due to re-declaration
-    char UNSUPPORTED_PTR = '\1';
 
 #endif
     typedef ptrsize_t size_t;
