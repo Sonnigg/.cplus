@@ -14,6 +14,17 @@ namespace std
         return total;
     } // std::size_t std::stringLength(const char *const _chpString)
 
+    void copyString(char *const _chpDest, const char *const _chpSource)
+    {
+        std::size_t idx = 0;
+        for (_chpSource[idx]; idx++)
+        {
+            _chpDest[idx] = _chpSource[idx];
+        }
+
+        _chpDest[idx] = '\0';
+    } // void std::copyString(char *const _chpDest, const char *const _chpSource)
+
     bool isSpace(const char _chChar)
     {
         return _chChar == ' ' || _chChar == '\n' || _chChar == '\t' || _chChar == '\r';

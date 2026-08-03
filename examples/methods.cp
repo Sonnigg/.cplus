@@ -4,9 +4,9 @@
 
 #include <types>
 #include <io>
+#include <chars>
 
-// including string.h for malloc, memcpy, memmove, etc. and stdlib.h for malloc and free as-well
-#include <string.h>
+// including stdlib. for malloc and free
 #include <stdlib.h>
 
 struct String
@@ -16,7 +16,7 @@ struct String
 
     static String new(const char *const string) // called via String::new("...")
     {
-        std::size_t len = strlen(string); // using strlen from string.h
+        std::size_t len = std::stringLength(string); // using std::stringLength(char *) from chars in libc+
         char *ptr = static_cast<char *>(malloc(sizeof(char) * (len + 1))); // size dynamically depending on len
         
         if (ptr == static_cast<char *>(nullptr))
@@ -28,8 +28,7 @@ struct String
             };
         }
 
-        memcpy(ptr, string, len + 1);
-        ptr[len] = '\0'; // ensure null termination
+        std::copyString(ptr, string); // using std::copyString(char *, char *) from chars in libc+, this ensures null-termination
         
         return String {
             data: ptr,
