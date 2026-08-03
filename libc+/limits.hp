@@ -26,6 +26,6 @@ namespace std
     const std::int32_t  int32_min  = -std::int32_max - 1;
     const std::int64_t  int64_min  = -std::int64_max - 1;
     // Signed range is: [-max - 1, max]
-}
+} // namespace std
 
 #endif

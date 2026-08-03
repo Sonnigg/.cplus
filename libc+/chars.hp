@@ -12,12 +12,12 @@ namespace std
         std::size_t total = 0;
         for (;_chpString[total];total++){}
         return total;
-    }
+    } // std::size_t std::stringLength(const char *const _chpString)
 
     bool isSpace(const char _chChar)
     {
         return _chChar == ' ' || _chChar == '\n' || _chChar == '\t' || _chChar == '\r';
-    }
+    } // bool std::isSpace(const char _chChar)
 
     bool isOnlySpace(const char *const _chpString)
     {
@@ -28,7 +28,7 @@ namespace std
         }
 
         return true;
-    }
+    } // bool std::isOnlySpace(const char *const _chpString)
 
     bool isDigit(const char _chChar)
     {
@@ -39,7 +39,7 @@ namespace std
             default:
                 return false;
         }
-    }
+    } // bool std::isDigit(const char _chChar)
 
     bool isOnlyDigit(const char *const _chpString)
     {
@@ -49,9 +49,9 @@ namespace std
                 return false;
         }
         return true;
-    }
+    } // bool std::isOnlyDigit(const char *const _chpString)
 
-    bool isBinaryDigit(const char _chChar)
+    bool isBinary(const char _chChar)
     {
         switch (_chChar)
         {
@@ -60,19 +60,19 @@ namespace std
             default:
                 return false;
         }
-    }
+    } // bool std::isBinary(const char _chChar)
 
-    bool isOnlyBinaryDigit(const char *const _chpString)
+    bool isOnlyBinary(const char *const _chpString)
     {
         for (std::size_t i = 0; _chpString[i]; i++)
         {
-            if (!std::isBinaryDigit(_chpString[i]))
+            if (!std::isBinary(_chpString[i]))
                 return false;
         }
         return true;
-    }
+    } // bool std::isOnlyBinary(const char *const _chpString)
 
-    bool isHexDigit(const char _chChar)
+    bool isHex(const char _chChar)
     {
         switch (_chChar)
         {
@@ -81,17 +81,17 @@ namespace std
             default:
                 return false;
         }
-    }
+    } // bool std::isHex(const char _chChar)
 
-    bool isOnlyHexDigit(const char *const _chpString)
+    bool isOnlyHex(const char *const _chpString)
     {
         for (std::size_t i = 0; _chpString[i]; i++)
         {
-            if (!std::isHexDigit(_chpString[i]))
+            if (!std::isHex(_chpString[i]))
                 return false;
         }
         return true;
-    }
+    } // bool std::isOnlyHex(const char *const _chpString)
 
     bool isAlpha(const char _chChar)
     {
@@ -102,7 +102,7 @@ namespace std
             default:
                 return false;
         }
-    }
+    } // bool std::isAlpha(const char _chChar)
 
     bool isOnlyAlpha(const char *const _chpString)
     {
@@ -112,12 +112,12 @@ namespace std
                 return false;
         }
         return true;
-    }
+    } // bool std::isOnlyAlpha(const char *const _chpString)
 
     bool isAlnum(const char _chChar)
     {
         return std::isDigit(_chChar) || std::isAlpha(_chChar);
-    }
+    } // bool std::isAlnum(const char _chChar)
 
     bool isOnlyAlnum(const char *const _chpString)
     {
@@ -127,7 +127,7 @@ namespace std
                 return false;
         }
         return true;
-    }
+    } // bool std::isOnlyAlnum(const char *const _chpString)
 
     bool isUpper(const char _chChar)
     {
@@ -138,7 +138,7 @@ namespace std
             default:
                 return false;
         }
-    }
+    } // bool std::isUpper(const char _chChar)
 
     bool isOnlyUpper(const char *const _chpString)
     {
@@ -148,7 +148,7 @@ namespace std
                 return false;
         }
         return true;
-    }
+    } // bool std::isOnlyUpper(const char *const _chpString)
 
     bool isLower(const char _chChar)
     {
@@ -159,7 +159,7 @@ namespace std
             default:
                 return false;
         }
-    }
+    } // bool std::isLower(const char _chChar)
 
     bool isOnlyLower(const char *const _chpString)
     {
@@ -169,7 +169,7 @@ namespace std
                 return false;
         }
         return true;
-    }
+    } // bool std::isOnlyLower(const char *const _chpString)
 
     bool isPunctuation(const char _chChar)
     {
@@ -180,7 +180,7 @@ namespace std
             default:
                 return false;
         }
-    }
-}
+    } // bool std::isPunctuation(const char _chChar)
+} // namespace std
 
 #endif
