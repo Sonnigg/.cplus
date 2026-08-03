@@ -6,7 +6,7 @@ Shortcut to the license : [LICENSE](./LICENSE)
 
 Shortcut to libc+       : [libc+](./libc+/)
 
-Shortcut to the source  : [source](./source/)
+Shortcut to the source  : [source](./bootstrap/)
 
 ## IMPORTANT
 
