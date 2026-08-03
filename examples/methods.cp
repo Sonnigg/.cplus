@@ -37,9 +37,25 @@ struct String
         };
     }
 
+    static void destroy(String *str)
+    {
+        free(str->data);
+        str->length = 0;
+    }
+
     String copy(String *self) // called via str.copy()
     {
         return String::new(self->data); // we can just make a new String since a copy is just the same thing but a new owned String!
+    }
+
+    char *chars(String *self)
+    {
+        return self->data;
+    }
+
+    std::size_t len(String *self)
+    {
+        return self->length;
     }
 }
 
@@ -48,10 +64,10 @@ int main()
     String str = String::new("Hello, World!\n");
     String new_one = str.copy();
     defer {
-        free(str.data);
-        free(new_one.data);
+        String::destroy(&str);
+        String::destroy(&new_one);
     }
 
-    std::puts(new_one.data);
+    std::puts(new_one.chars());
     return 0;
 }
