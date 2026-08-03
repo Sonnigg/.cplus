@@ -40,6 +40,7 @@ struct String
     static void destroy(String *str)
     {
         free(str->data);
+        str->data = nullptr;
         str->length = 0;
     }
 
@@ -48,7 +49,7 @@ struct String
         return String::new(self->data); // we can just make a new String since a copy is just the same thing but a new owned String!
     }
 
-    char *chars(String *self)
+    const char *chars(String *self)
     {
         return self->data;
     }

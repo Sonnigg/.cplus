@@ -895,17 +895,273 @@ static void emit_fragment_with_substitution(Transpiler *t, NamespaceStack *ns, s
     }
 }
 
+static bool is_tok_str(const Token *t, const char *s)
+{
+    size_t len = strlen(s);
+    return t->length == len && memcmp(t->begin, s, len) == 0;
+}
+
+static bool is_or_op(Transpiler *t, size_t pos, size_t end, size_t *consumed)
+{
+    Token *x;
+    if (pos >= end) return false;
+    x = at(t, pos);
+    if (is_tok_str(x, "||")) {
+        if (consumed) *consumed = 1;
+        return true;
+    }
+    if (pos + 1 < end && token_char(x, '|') && token_char(at(t, pos + 1), '|') && at(t, pos + 1)->ws_length == 0) {
+        if (consumed) *consumed = 2;
+        return true;
+    }
+    return false;
+}
+
+static bool is_and_op(Transpiler *t, size_t pos, size_t end, size_t *consumed)
+{
+    Token *x;
+    if (pos >= end) return false;
+    x = at(t, pos);
+    if (is_tok_str(x, "&&")) {
+        if (consumed) *consumed = 1;
+        return true;
+    }
+    if (pos + 1 < end && token_char(x, '&') && token_char(at(t, pos + 1), '&') && at(t, pos + 1)->ws_length == 0) {
+        if (consumed) *consumed = 2;
+        return true;
+    }
+    return false;
+}
+
+static void emit_case_expr_primary(Transpiler *t, NamespaceStack *ns, size_t begin, size_t end)
+{
+    size_t range_pos = end;
+    bool range_found = false;
+    TokenKind range_kind = TOK_OTHER;
+    int d = 0;
+    size_t k;
+
+    /* Strip outer matching parentheses if the entire primary expression is enclosed in (...) */
+    while (begin + 1 < end && at(t, begin)->kind == TOK_LPAREN) {
+        size_t match = matching(t, begin, TOK_LPAREN, TOK_RPAREN, end);
+        if (match == end - 1) {
+            begin++;
+            end--;
+        } else {
+            break;
+        }
+    }
+    if (begin >= end) return;
+
+    /* Search for range operator => or ==> at top level (depth 0) */
+    d = 0;
+    for (k = begin; k < end; ++k) {
+        Token *z = at(t, k);
+        if (z->kind == TOK_LPAREN || z->kind == TOK_LBRACKET || z->kind == TOK_LBRACE) {
+            d++;
+        } else if (z->kind == TOK_RPAREN || z->kind == TOK_RBRACKET || z->kind == TOK_RBRACE) {
+            if (d > 0) d--;
+        } else if (d == 0 && (z->kind == TOK_RANGE || z->kind == TOK_RANGE_INCLUSIVE)) {
+            range_pos = k;
+            range_found = true;
+            range_kind = z->kind;
+            break;
+        }
+    }
+
+    if (range_found) {
+        buffer_puts(&t->output, "(__switch_value >= ");
+        emit_fragment_with_substitution(t, ns, begin, range_pos);
+        buffer_puts(&t->output, " && __switch_value ");
+        if (range_kind == TOK_RANGE_INCLUSIVE) {
+            buffer_puts(&t->output, "<= ");
+        } else {
+            buffer_puts(&t->output, "< ");
+        }
+        emit_fragment_with_substitution(t, ns, range_pos + 1, end);
+        buffer_puts(&t->output, ")");
+    } else {
+        bool predicate = false;
+        for (k = begin; k < end; ++k) {
+            Token *z = at(t, k);
+            if (z->kind == TOK_IDENTIFIER && token_is(z, "_")) {
+                predicate = true;
+                break;
+            }
+        }
+        if (predicate) {
+            emit_fragment_with_substitution(t, ns, begin, end);
+        } else {
+            buffer_puts(&t->output, "(__switch_value == ");
+            emit_fragment_with_substitution(t, ns, begin, end);
+            buffer_puts(&t->output, ")");
+        }
+    }
+}
+
+static void emit_case_expr_and(Transpiler *t, NamespaceStack *ns, size_t begin, size_t end)
+{
+    size_t i = begin;
+    int d = 0;
+    bool has_and = false;
+    size_t seg_start;
+    bool first;
+
+    while (i < end) {
+        Token *z = at(t, i);
+        if (z->kind == TOK_LPAREN || z->kind == TOK_LBRACKET || z->kind == TOK_LBRACE) {
+            d++;
+            i++;
+        } else if (z->kind == TOK_RPAREN || z->kind == TOK_RBRACKET || z->kind == TOK_RBRACE) {
+            if (d > 0) d--;
+            i++;
+        } else if (d == 0) {
+            size_t consumed = 0;
+            if (is_and_op(t, i, end, &consumed)) {
+                has_and = true;
+                break;
+            }
+            i++;
+        } else {
+            i++;
+        }
+    }
+
+    if (!has_and) {
+        emit_case_expr_primary(t, ns, begin, end);
+        return;
+    }
+
+    i = begin;
+    seg_start = begin;
+    d = 0;
+    first = true;
+
+    while (i < end) {
+        Token *z = at(t, i);
+        if (z->kind == TOK_LPAREN || z->kind == TOK_LBRACKET || z->kind == TOK_LBRACE) {
+            d++;
+            i++;
+        } else if (z->kind == TOK_RPAREN || z->kind == TOK_RBRACKET || z->kind == TOK_RBRACE) {
+            if (d > 0) d--;
+            i++;
+        } else if (d == 0) {
+            size_t consumed = 0;
+            if (is_and_op(t, i, end, &consumed)) {
+                if (!first) {
+                    buffer_puts(&t->output, " && ");
+                } else {
+                    buffer_puts(&t->output, "(");
+                    first = false;
+                }
+                emit_case_expr_primary(t, ns, seg_start, i);
+                i += consumed;
+                seg_start = i;
+                continue;
+            }
+            i++;
+        } else {
+            i++;
+        }
+    }
+
+    if (seg_start < end) {
+        if (!first) {
+            buffer_puts(&t->output, " && ");
+        }
+        emit_case_expr_primary(t, ns, seg_start, end);
+    }
+    if (!first) {
+        buffer_puts(&t->output, ")");
+    }
+}
+
+static void emit_case_expr_or(Transpiler *t, NamespaceStack *ns, size_t begin, size_t end)
+{
+    size_t i = begin;
+    int d = 0;
+    bool has_or = false;
+    size_t seg_start;
+    bool first;
+
+    while (i < end) {
+        Token *z = at(t, i);
+        if (z->kind == TOK_LPAREN || z->kind == TOK_LBRACKET || z->kind == TOK_LBRACE) {
+            d++;
+            i++;
+        } else if (z->kind == TOK_RPAREN || z->kind == TOK_RBRACKET || z->kind == TOK_RBRACE) {
+            if (d > 0) d--;
+            i++;
+        } else if (d == 0) {
+            size_t consumed = 0;
+            if (is_or_op(t, i, end, &consumed)) {
+                has_or = true;
+                break;
+            }
+            i++;
+        } else {
+            i++;
+        }
+    }
+
+    if (!has_or) {
+        emit_case_expr_and(t, ns, begin, end);
+        return;
+    }
+
+    i = begin;
+    seg_start = begin;
+    d = 0;
+    first = true;
+
+    while (i < end) {
+        Token *z = at(t, i);
+        if (z->kind == TOK_LPAREN || z->kind == TOK_LBRACKET || z->kind == TOK_LBRACE) {
+            d++;
+            i++;
+        } else if (z->kind == TOK_RPAREN || z->kind == TOK_RBRACKET || z->kind == TOK_RBRACE) {
+            if (d > 0) d--;
+            i++;
+        } else if (d == 0) {
+            size_t consumed = 0;
+            if (is_or_op(t, i, end, &consumed)) {
+                if (!first) {
+                    buffer_puts(&t->output, " || ");
+                } else {
+                    first = false;
+                }
+                emit_case_expr_and(t, ns, seg_start, i);
+                i += consumed;
+                seg_start = i;
+                continue;
+            }
+            i++;
+        } else {
+            i++;
+        }
+    }
+
+    if (seg_start < end) {
+        if (!first) {
+            buffer_puts(&t->output, " || ");
+        }
+        emit_case_expr_and(t, ns, seg_start, end);
+    }
+}
+
 static bool try_emit_switch(Transpiler *t, NamespaceStack *ns, size_t *pp, size_t end)
 {
-    size_t p = *pp, lp, rp, body_open, body_close, i, case_begin = end, clause_begin = end;
+    size_t p = *pp, lp, rp, body_open, body_close, i;
     bool has_break = false;
     bool saw_case = false;
+
     if (!token_is(at(t, p), "switch") || p + 1 >= end || at(t, p + 1)->kind != TOK_LPAREN) return false;
     lp = p + 1;
     rp = matching(t, lp, TOK_LPAREN, TOK_RPAREN, end);
     if (rp + 1 >= end || at(t, rp + 1)->kind != TOK_LBRACE) return false;
     body_open = rp + 1;
     body_close = matching(t, body_open, TOK_LBRACE, TOK_RBRACE, end);
+
     for (i = body_open + 1; i < body_close; ++i) {
         Token *x = at(t, i);
         if (x->kind == TOK_IDENTIFIER && token_is(x, "break")) {
@@ -919,73 +1175,40 @@ static bool try_emit_switch(Transpiler *t, NamespaceStack *ns, size_t *pp, size_
     buffer_puts(&t->output, "({ int __switch_value = ");
     emit_fragment_with_substitution(t, ns, p + 2, rp);
     buffer_puts(&t->output, "; ");
+
     i = body_open + 1;
     while (i < body_close) {
         Token *x = at(t, i);
         if (x->kind == TOK_IDENTIFIER && token_is(x, "case")) {
             size_t label_begin = i + 1, label_end = i + 1, colon = body_close, j;
-            bool range = false;
-            bool inclusive = false;
-            size_t range_pos = body_close;
+            int d = 0;
             if (label_begin >= body_close) break;
+
             while (label_end < body_close) {
                 Token *z = at(t, label_end);
-                if (z->kind == TOK_COLON) {
+                if (z->kind == TOK_LPAREN || z->kind == TOK_LBRACKET || z->kind == TOK_LBRACE) {
+                    d++;
+                } else if (z->kind == TOK_RPAREN || z->kind == TOK_RBRACKET || z->kind == TOK_RBRACE) {
+                    if (d > 0) d--;
+                } else if (d == 0 && z->kind == TOK_COLON) {
                     colon = label_end;
                     break;
-                }
-                if (z->kind == TOK_RANGE) {
-                    range = true;
-                    inclusive = false;
-                    range_pos = label_end;
-                } else if (z->kind == TOK_RANGE_INCLUSIVE) {
-                    range = true;
-                    inclusive = true;
-                    range_pos = label_end;
                 }
                 ++label_end;
             }
             if (colon >= body_close) break;
+
             if (!saw_case) {
                 buffer_puts(&t->output, "if (");
             } else {
                 buffer_puts(&t->output, "else if (");
             }
-            if (!range) {
-                bool predicate = false;
-                size_t k;
 
-                for (k = label_begin; k < colon; ++k) {
-                    Token *z = at(t, k);
+            emit_case_expr_or(t, ns, label_begin, colon);
 
-                    if (z->kind == TOK_IDENTIFIER && token_is(z, "_")) {
-                        predicate = true;
-                        break;
-                    }
-                }
-
-                if (predicate) {
-                    emit_fragment_with_substitution(t, ns, label_begin, colon);
-                } else {
-                    buffer_puts(&t->output, "(__switch_value == ");
-                    emit_fragment_with_substitution(t, ns, label_begin, colon);
-                    buffer_puts(&t->output, ")");
-                }
-            } else {
-                buffer_puts(&t->output, "(__switch_value >= ");
-                emit_fragment_with_substitution(t, ns, label_begin, range_pos);
-                buffer_puts(&t->output, ") && (__switch_value ");
-                if (inclusive) {
-                    buffer_puts(&t->output, "<=");
-                } else {
-                    buffer_puts(&t->output, "<");
-                }
-                buffer_putc(&t->output, ' ');
-                emit_fragment_with_substitution(t, ns, range_pos + 1, colon);
-                buffer_puts(&t->output, ")");
-            }
             buffer_puts(&t->output, ") { ");
             saw_case = true;
+
             j = colon + 1;
             while (j < body_close) {
                 Token *z = at(t, j);
@@ -1529,6 +1752,10 @@ void transpile(Transpiler *t)
     "#endif\r\n"
     "#endif\r\n\r\n");
     buffer_puts(&t->output, "#ifndef true\r\n#define true 1\r\n#endif\r\n#ifndef false\r\n#define false 0\r\n#endif\r\n\r\n");
+    buffer_puts(&t->output, 
+    "#ifndef bool\r\n"
+    "#define bool unsigned char\r\n"
+    "#endif\r\n\r\n");
 #else
     buffer_puts(&t->output, "/* Generated by C+ compiler. DO NOT EDIT. */\n\n");
     buffer_puts(&t->output,
@@ -1544,6 +1771,10 @@ void transpile(Transpiler *t)
     "#endif\n"
     "#endif\n\n");
     buffer_puts(&t->output, "#ifndef true\n#define true 1\n#endif\n#ifndef false\n#define false 0\n#endif\n\n");
+    buffer_puts(&t->output, 
+    "#ifndef bool\n"
+    "#define bool unsigned char\n"
+    "#endif\n\n");
 #endif
     discover_range(t, &ns, 0, t->tokens.count - 1);
     transpile_range(t, &ns, 0, t->tokens.count - 1);

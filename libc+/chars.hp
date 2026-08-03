@@ -1,0 +1,61 @@
+// chars.hp
+
+#ifndef _CHARS_HP
+#define _CHARS_HP
+
+#include <types>
+
+namespace std
+{
+    std::size_t stringLength(const char *const _chpString)
+    {
+        std::size_t total = 0;
+        for (;_chpString[total];total++){}
+        return total;
+    }
+
+    bool isSpace(const char _chChar)
+    {
+        return _chChar == ' ' || _chChar == '\n' || _chChar == '\t' || _chChar == '\r';
+    }
+
+    bool isOnlySpace(const char *const _chpString)
+    {
+        for (std::size_t i = 0; _chpString[i]; i++) // _chpString[i] auto-stops on the null terminator, so no need for a second length pass or anything
+        {
+            if (!std::isSpace(_chpString[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    bool isDigit(const char _chChar)
+    {
+        switch (_chChar)
+        {
+            case '0' ==> '9':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool isAlpha(const char _chChar)
+    {
+        switch (_chChar)
+        {
+            case 'a' ==> 'z' || 'A' ==> 'Z':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool isAlnum(const char _chChar)
+    {
+        return std::isDigit(_chChar) || std::isAlpha(_chChar);
+    }
+}
+
+#endif

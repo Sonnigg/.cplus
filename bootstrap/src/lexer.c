@@ -140,11 +140,15 @@ Token lexer_next(Lexer *l)
         case '=':
             if (lpeek(l) == '>') {
                 ladvance(l);
+                t.kind = TOK_RANGE;
+            }
+            else if (lpeek(l) == '=') {
+                ladvance(l);
                 if (lpeek(l) == '>') {
                     ladvance(l);
                     t.kind = TOK_RANGE_INCLUSIVE;
                 } else {
-                    t.kind = TOK_RANGE;
+                    t.kind = TOK_OTHER;
                 }
             } else {
                 t.kind = TOK_OTHER;
