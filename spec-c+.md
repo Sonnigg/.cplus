@@ -102,6 +102,7 @@ switch (some_value)
 
 ### Regarding the precedence of operations in `case` (3rd August 2026)
 The precedence is as follows:
+
     Highest
 
         ()
@@ -117,5 +118,5 @@ The precedence is as follows:
         &&
 
         ||
-        
+
     Lowest
