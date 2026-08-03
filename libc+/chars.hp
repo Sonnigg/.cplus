@@ -14,6 +14,13 @@ namespace std
         return total;
     } // std::size_t std::stringLength(const char *const _chpString)
 
+    std::size_t stringLengthWithNull(const char *const _chpString)
+    {
+        std::size_t total = 0;
+        for (;_chpString[total];total++){}
+        return total;
+    }
+
     void copyString(char *const _chpDest, const char *const _chpSource)
     {
         std::size_t idx = 0;

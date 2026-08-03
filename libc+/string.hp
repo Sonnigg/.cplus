@@ -1,0 +1,82 @@
+#ifndef _STRING_HP
+#define _STRING_HP
+
+#include <types>
+#include <io>
+#include <chars>
+
+// for now because of malloc, realloc, and free
+#include <stdlib.h>
+
+namespace HIDDEN__STD__1
+{
+    const std::size_t INIT_LENGTH = 256;
+}
+
+namespace std
+{
+    struct String
+    {
+        char       *__data;
+        std::size_t __len ;
+
+        static String new()
+        {
+            char *ptr = static_cast<char *>(malloc(sizeof(char) * HIDDEN__STD__1::INIT_LENGTH));
+            
+            if (!ptr) // aka ptr == nullptr
+            {
+                std::errputs("Out Of Memory, returning nullptr as data and 0 for the other fields (String::new).");
+                return String {
+                    __data: nullptr,
+                    __len : 0
+                };
+            }
+
+            ptr[0] = '\0';
+
+            return String {
+                __data: ptr,
+                __len : 0
+            };
+        }
+
+        static String fromChars(const char *const _chpString)
+        {
+            if (!_chpString) // aka _chpString == nullptr
+                return String::new();
+            std::size_t length = std::stringLengthWithNull(_chpString);
+            char *ptr = static_cast<char *>(malloc(sizeof(char) * length));
+
+            if (!ptr) // aka ptr == nullptr
+            {
+                std::errputs("Out Of Memory, returning nullptr as data and 0 for the other fields (String::fromChars).");
+                return String {
+                    __data: nullptr,
+                    __len : 0,
+                };
+            }
+
+            std::copyString(ptr, _chpString);
+
+            return String {
+                __data: ptr,
+                __len : length-1
+            };
+        }
+
+        void destroy(std::String *self)
+        {
+            free(self->__data);
+            self->__data = nullptr;
+            self->__len  = 0;
+        }
+
+        const char *chars(std::String *self)
+        {
+            return self->__data;
+        }
+    }
+}
+
+#endif

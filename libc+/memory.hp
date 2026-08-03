@@ -1,0 +1,16 @@
+#ifndef _MEMORY_HP
+#define _MEMORY_HP
+
+namespace std
+{
+    void copyMemory(void *const _chpDest, const void *const _chpSource, std::size_t _szLength)
+    {
+        std::size_t idx = 0;
+        for (;idx<_szLength; idx++)
+        {
+            _chpDest[idx] = _chpSource[idx];
+        }
+    }
+}
+
+#endif
