@@ -11,25 +11,27 @@
 namespace HIDDEN__STD__1
 {
     const std::size_t INIT_LENGTH = 256;
-}
+} // namespace HIDDEN__STD__1
 
 namespace std
 {
     struct String
     {
         char       *__data;
-        std::size_t __len ;
+        std::size_t __len;
+        std::size_t __cap;
 
         static String new()
         {
             char *ptr = static_cast<char *>(malloc(sizeof(char) * HIDDEN__STD__1::INIT_LENGTH));
-            
-            if (!ptr) // aka ptr == nullptr
+
+            if (!ptr)
             {
-                std::errputs("Out Of Memory, returning nullptr as data and 0 for the other fields (String::new).");
+                std::errputs("Out Of Memory, returning nullptr as data and 0 for the length (String::new).");
                 return String {
                     __data: nullptr,
-                    __len : 0
+                    __len : 0,
+                    __cap : HIDDEN__STD__1::INIT_LENGTH,
                 };
             }
 
@@ -37,46 +39,100 @@ namespace std
 
             return String {
                 __data: ptr,
-                __len : 0
+                __len : 0,
+                __cap : HIDDEN__STD__1::INIT_LENGTH,
             };
-        }
+        } // static String std::String::new()
 
-        static String fromChars(const char *const _chpString)
+        static String fromChars(const char *const string)
         {
-            if (!_chpString) // aka _chpString == nullptr
+            if (!string)
                 return String::new();
-            std::size_t length = std::stringLengthWithNull(_chpString);
+
+            std::size_t length = std::stringLengthWithNull(string);
+
             char *ptr = static_cast<char *>(malloc(sizeof(char) * length));
 
-            if (!ptr) // aka ptr == nullptr
+            if (!ptr)
             {
-                std::errputs("Out Of Memory, returning nullptr as data and 0 for the other fields (String::fromChars).");
+                std::errputs("Out Of Memory, returning nullptr as data and 0 for the length (String::fromChars).");
                 return String {
                     __data: nullptr,
                     __len : 0,
                 };
             }
 
-            std::copyString(ptr, _chpString);
+            std::copyString(ptr, string);
 
             return String {
                 __data: ptr,
-                __len : length-1
+                __len : length - 1,
+                __cap : length,
             };
-        }
+        } // static String std::String::fromChars(const char *const string)
 
-        void destroy(std::String *self)
+        void destroy(String *self)
         {
+            if (!self)
+                return;
+
             free(self->__data);
+
             self->__data = nullptr;
             self->__len  = 0;
-        }
+            self->__cap  = 0;
+        } // void std::String::destroy(String *self)
 
-        const char *chars(std::String *self)
+        void appendChars(String *self, const char *const string)
         {
+            if (!self || !self->__data || !string)
+                return;
+
+            std::size_t appendLen = std::stringLength(string);
+            std::size_t required  = self->__len + appendLen + 1;
+
+            if (required > self->__cap)
+            {
+                std::size_t newCap = self->__cap;
+
+                while (newCap < required)
+                    newCap *= 2;
+
+                char *ptr = static_cast<char *>(
+                    realloc(self->__data, sizeof(char) * newCap)
+                );
+
+                if (!ptr)
+                {
+                    std::errputs("Out Of Memory, could not append (String::appendChars).");
+                    return;
+                }
+
+                self->__data = ptr;
+                self->__cap  = newCap;
+            }
+
+            std::copyString(self->__data + self->__len, string);
+
+            self->__len += appendLen;
+        } // void std::String::appendChars(String *self, const char *const string)
+
+        void appendString(String *self, const String *const other)
+        {
+            if (!self || !other)
+                return;
+
+            self->appendChars(other->chars());
+        } // void std::String::appendString(String *self, const String *const other)
+
+        const char *chars(const String *const self)
+        {
+            if (!self)
+                return nullptr;
+
             return self->__data;
-        }
-    }
-}
+        } // const char *std::String::chars(const String *const self)
+    } // struct String
+} // namespace std
 
 #endif

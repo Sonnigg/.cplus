@@ -18,8 +18,8 @@ namespace std
     {
         std::size_t total = 0;
         for (;_chpString[total];total++){}
-        return total;
-    }
+        return total+1;
+    } // std::size_t std::stringLengthWithNull(const char *const _chpString)
 
     void copyString(char *const _chpDest, const char *const _chpSource)
     {
