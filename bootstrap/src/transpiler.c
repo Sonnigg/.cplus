@@ -1213,30 +1213,54 @@ static bool try_emit_switch(Transpiler *t, NamespaceStack *ns, size_t *pp, size_
             buffer_puts(&t->output, ") { ");
             saw_case = true;
 
+            /* * Find the end of this case block by tracking depth.
+             * This ensures a nested switch doesn't accidentally terminate this block.
+             */
             j = colon + 1;
+            d = 0;
             while (j < body_close) {
                 Token *z = at(t, j);
-                if (z->kind == TOK_IDENTIFIER && token_is(z, "case")) break;
-                if (z->kind == TOK_IDENTIFIER && token_is(z, "default")) break;
-                emit_full(&t->output, z);
+                if (z->kind == TOK_LPAREN || z->kind == TOK_LBRACKET || z->kind == TOK_LBRACE) {
+                    d++;
+                } else if (z->kind == TOK_RPAREN || z->kind == TOK_RBRACKET || z->kind == TOK_RBRACE) {
+                    if (d > 0) d--;
+                } else if (d == 0 && z->kind == TOK_IDENTIFIER && (token_is(z, "case") || token_is(z, "default"))) {
+                    break;
+                }
                 ++j;
             }
+
+            /* Delegate back to the transpiler to properly resolve namespaces, variables, etc. */
+            emit_fragment(t, ns, colon + 1, j);
+            
             buffer_puts(&t->output, " } ");
             i = j;
             continue;
         }
+        
         if (x->kind == TOK_IDENTIFIER && token_is(x, "default")) {
             size_t colon = i + 1, j;
             if (colon < body_close && at(t, colon)->kind == TOK_COLON) {
+                int d = 0;
+                
                 buffer_puts(&t->output, "else { ");
+                
                 j = colon + 1;
                 while (j < body_close) {
                     Token *z = at(t, j);
-                    if (z->kind == TOK_IDENTIFIER && token_is(z, "case")) break;
-                    if (z->kind == TOK_IDENTIFIER && token_is(z, "default")) break;
-                    emit_full(&t->output, z);
+                    if (z->kind == TOK_LPAREN || z->kind == TOK_LBRACKET || z->kind == TOK_LBRACE) {
+                        d++;
+                    } else if (z->kind == TOK_RPAREN || z->kind == TOK_RBRACKET || z->kind == TOK_RBRACE) {
+                        if (d > 0) d--;
+                    } else if (d == 0 && z->kind == TOK_IDENTIFIER && (token_is(z, "case") || token_is(z, "default"))) {
+                        break;
+                    }
                     ++j;
                 }
+
+                /* Delegate back to the transpiler */
+                emit_fragment(t, ns, colon + 1, j);
+
                 buffer_puts(&t->output, " } ");
                 i = j;
                 continue;
