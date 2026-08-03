@@ -17,7 +17,7 @@ namespace std
     void copyString(char *const _chpDest, const char *const _chpSource)
     {
         std::size_t idx = 0;
-        for (_chpSource[idx]; idx++)
+        for (;_chpSource[idx]; idx++)
         {
             _chpDest[idx] = _chpSource[idx];
         }
