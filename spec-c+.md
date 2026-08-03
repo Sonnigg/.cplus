@@ -37,18 +37,18 @@ When generating C code without explicit target information, the generated fallba
 ## About C+'s switch (3rd August 2026)
 C+'s switch does not introduce performance loss and lowers into GNU (specifically TinyCC as it being the backend) compatible if-statements. There are multiple things that are given by C+ and are standardized.
 
-The switch value placeholder. (_ for your switch value)
+The switch value placeholder (_ for your switch value)
 ```cx
 switch (some_value)
 {
     case _:
-        foo(); // will always execute since _ is the switch value placeholder. and is correctly lowered to __switch_value
+        foo(); // will always execute since _ is the switch value placeholder and is correctly lowered to __switch_value
         // whereas if you use some_value, it won't be lowered correctly
     default:
         bar(); // never executes
 }
 ```
-> _ is the switch value placeholder. and used everywhere you want your switch value to be used, e.g. in the next predicate case (predicate functions).
+> _ is the switch value placeholder and is used everywhere you want your switch value to be used, e.g. in the next predicate case (predicate functions).
 
 The predicate functions (lightweight pattern matching)
 ```cx
