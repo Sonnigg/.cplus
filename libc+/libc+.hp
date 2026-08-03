@@ -86,7 +86,7 @@ namespace std
 {
     void hello()
     {
-        std::write_stdout("Hello World!\n", 13 /* because lengthWithNull - 1 */);
+        std::write_stdout("Hello!\n", 7 /* because lengthWithNull - 1 */);
     } // void std::hello()
 
     std::Platform platform()

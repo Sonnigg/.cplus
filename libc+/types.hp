@@ -8,15 +8,15 @@ namespace std
     /*
         Integer types
     */
-    typedef unsigned char       uint8_t;
-    typedef unsigned short      uint16_t;
-    typedef unsigned int        uint32_t;
-    typedef unsigned long long  uint64_t;
+    typedef unsigned char       uint8_t;  // max: 2^8  - 1
+    typedef unsigned short      uint16_t; // max: 2^16 - 1
+    typedef unsigned int        uint32_t; // max: 2^32 - 1
+    typedef unsigned long long  uint64_t; // max: 2^64 - 1
 
-    typedef signed char         int8_t;
-    typedef signed short        int16_t;
-    typedef signed int          int32_t;
-    typedef signed long long    int64_t;
+    typedef signed char         int8_t;   // min: 2^7 , max: 2^7  - 1
+    typedef signed short        int16_t;  // min: 2^15, max: 2^15 - 1
+    typedef signed int          int32_t;  // min: 2^31, max: 2^31 - 1
+    typedef signed long long    int64_t;  // min: 2^63, max: 2^63 - 1
 
     /*
         Pointer-sized types
