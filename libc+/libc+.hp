@@ -194,7 +194,7 @@ namespace std
 
     #endif
 
-        p.__ptr_size = sizeof(void *);
+        p.__ptr_size = CMPL__PTR_SIZE;
 
         return p;
     } // std::Platform std::platform()
