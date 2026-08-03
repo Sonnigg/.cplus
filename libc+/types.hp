@@ -30,7 +30,6 @@ namespace std
     typedef int32_t  sptrsize_t;
 
 #elif CMPL__PTR_SIZE == 2
-    // this shouldn't happen though, since CMPL__PTR_SIZE is either 8 (64 bit targets) or 4 (32 bit targets), otherwise always fall back to 2 (16 bit targets)
     typedef uint16_t ptrsize_t;
     typedef int16_t  sptrsize_t;
 
