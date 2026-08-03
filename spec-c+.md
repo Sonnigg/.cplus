@@ -102,12 +102,20 @@ switch (some_value)
 
 ### Regarding the precedence of operations in `case` (3rd August 2026)
 The precedence is as follows:
-    Highest\\
-        ()\\
-        predicate functions\\
-        _\\
-        literal equality\\
-        =>   ==>\\
-        &&\\
-        ||\\
+    Highest
+
+        ()
+
+        predicate functions
+
+        _
+
+        literal equality
+
+        =>   ==>
+
+        &&
+
+        ||
+        
     Lowest
