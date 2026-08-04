@@ -81,7 +81,7 @@
         },
         {
           "name": "keyword.declaration.cx",
-          "match": "\\b(namespace|struct|enum|typedef|inline|static|const)\\b"
+          "match": "\\b(namespace|struct|enum|typedef|inline|static|const|volatile|extern)\\b"
         },
         {
           "name": "keyword.constant.cx",
