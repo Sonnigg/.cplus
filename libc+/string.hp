@@ -141,7 +141,7 @@ namespace std
         {
             return StringView {
                 __data: _chpString,
-                __len : std::stringLength(_chpString);
+                __len : std::stringLength(_chpString),
             };
         } // static std::StringView std::StringView::fromChars(const char *const _chpString)
 
