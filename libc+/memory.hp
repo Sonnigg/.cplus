@@ -20,31 +20,29 @@ long InterlockedCompareExchange(volatile long* Destination, long Exchange, long 
 
 namespace HIDDEN__STD__2
 {
-
     static volatile long _memory_lock = 0;
 
     static void memory_acquire_lock() {
         while (InterlockedCompareExchange(&_memory_lock, 1, 0) != 0) {
             // Spin
         }
-    }
+    } // static void HIDDEN__STD__2::memory_acquire_lock()
 
     static void memory_release_lock() {
         _memory_lock = 0;
-    }
+    } // static void HIDDEN__STD__2::memory_release_lock()
 
     static void *os_allocate(std::size_t size) {
         return VirtualAlloc(0, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    }
+    } // static void *HIDDEN__STD__2::os_allocate(std::size_t size)
 
     static void os_free(void *ptr, std::size_t size) {
         static_cast<void>(size);
         if (ptr) {
             VirtualFree(ptr, 0, MEM_RELEASE);
         }
-    }
-
-}
+    } // static void HIDDEN__STD__2::os_free(void *ptr, std::size_t size)
+} // namespace HIDDEN__STD__2
 
 #else
 
@@ -53,32 +51,30 @@ namespace HIDDEN__STD__2
 
 namespace HIDDEN__STD__2
 {
-
     static volatile int _memory_lock = 0;
 
     static void memory_acquire_lock() {
         while (__atomic_test_and_set(&_memory_lock, __ATOMIC_ACQUIRE)) {
             // Spin
         }
-    }
+    } // static void HIDDEN__STD__2::memory_acquire_lock()
 
     static void memory_release_lock() {
         __atomic_clear(&_memory_lock, __ATOMIC_RELEASE);
-    }
+    } // static void HIDDEN__STD__2::memory_release_lock()
 
     static void *os_allocate(std::size_t size) {
         void *p = mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (p == static_cast<void *>(-1)) return 0;
         return p;
-    }
+    } // static void *HIDDEN__STD__2::os_allocate(std::size_t size)
 
     static void os_free(void *ptr, std::size_t size) {
         if (ptr && size > 0) {
             munmap(ptr, size);
         }
-    }
-
-}
+    } // static void HIDDEN__STD__2::os_free(void *ptr, std::size_t size)
+} // namespace HIDDEN__STD__2
 
 #endif
 
@@ -96,7 +92,7 @@ namespace std
         {
             d[idx] = s[idx];
         }
-    }
+    } // void std::copyMemory(void *const _chpDest, const void *const _chpSource, std::size_t _szSize)
 
     void *moveMemory(void *const _chpDest, const void *const _chpSource, std::size_t _szSize)
     {
@@ -116,7 +112,7 @@ namespace std
             }
         }
         return _chpDest;
-    }
+    } // void *std::moveMemory(void *const _chpDest, const void *const _chpSource, std::size_t _szSize)
 
     void *allocateMemory(std::size_t _szSize)
     {
@@ -134,7 +130,7 @@ namespace std
         HIDDEN__STD__2::memory_release_lock();
         
         return user_ptr;
-    }
+    } // void *std::allocateMemory(std::size_t _szSize)
 
     void freeMemory(void *const _chpPtr)
     {
@@ -145,7 +141,7 @@ namespace std
         std::size_t old_size = *(static_cast<std::size_t *>(raw));
         HIDDEN__STD__2::os_free(raw, old_size + _MEMORY_HEADER_SIZE);
         HIDDEN__STD__2::memory_release_lock();
-    }
+    } // void std::freeMemory(void *const _chpPtr)
 
     void *reallocateMemory(void *const _chpPtr, std::size_t _szNewSize)
     {
@@ -171,7 +167,7 @@ namespace std
         std::freeMemory(_chpPtr);
 
         return new_ptr;
-    }
-}
+    } // void *std::reallocateMemory(void *const _chpPtr, std::size_t _szNewSize)
+} // namespace std
 
 #endif
