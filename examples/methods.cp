@@ -5,9 +5,7 @@
 #include <types>
 #include <io>
 #include <chars>
-
-// including stdlib. for malloc and free
-#include <stdlib.h>
+#include <memory>
 
 struct String
 {
@@ -17,7 +15,7 @@ struct String
     static String new(const char *const string) // called via String::new("...")
     {
         std::size_t len = std::stringLength(string); // using std::stringLength(char *) from chars in libc+
-        char *ptr = static_cast<char *>(malloc(sizeof(char) * (len + 1))); // size dynamically depending on len
+        char *ptr = static_cast<char *>(std::allocateMemory(sizeof(char) * (len + 1))); // size dynamically depending on len
         
         if (ptr == static_cast<char *>(nullptr))
         {
@@ -38,7 +36,7 @@ struct String
 
     static void destroy(String *str)
     {
-        free(str->data);
+        std::freeMemory(str->data);
         str->data = nullptr;
         str->length = 0;
     }
