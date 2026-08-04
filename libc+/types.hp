@@ -34,7 +34,8 @@ namespace std
     typedef int16_t  sptrsize_t;
 
 #endif
-    typedef ptrsize_t size_t;
+    typedef ptrsize_t  size_t;
+    typedef sptrsize_t ssize_t;
 } // namespace std
 
 #endif // #ifndef _TYPES_HP

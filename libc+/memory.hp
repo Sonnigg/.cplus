@@ -4,19 +4,7 @@
 #include <types>
 
 #if defined(_WIN32) || defined(_WIN64)
-typedef unsigned long DWORD;
-typedef void* LPVOID;
-typedef std::uint64_t ULONG_PTR;
-typedef ULONG_PTR SIZE_T;
-
-#define MEM_COMMIT 0x00001000
-#define MEM_RESERVE 0x00002000
-#define MEM_RELEASE 0x00008000
-#define PAGE_READWRITE 0x04
-
-LPVOID VirtualAlloc(LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
-int VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD dwFreeType);
-long InterlockedCompareExchange(volatile long* Destination, long Exchange, long Comparand);
+#include <windows.h>
 
 namespace HIDDEN__STD__2
 {
@@ -26,23 +14,23 @@ namespace HIDDEN__STD__2
         while (InterlockedCompareExchange(&_memory_lock, 1, 0) != 0) {
             // Spin
         }
-    } // static void HIDDEN__STD__2::memory_acquire_lock()
+    }
 
     static void memory_release_lock() {
         _memory_lock = 0;
-    } // static void HIDDEN__STD__2::memory_release_lock()
+    }
 
     static void *os_allocate(std::size_t size) {
         return VirtualAlloc(0, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    } // static void *HIDDEN__STD__2::os_allocate(std::size_t size)
+    }
 
     static void os_free(void *ptr, std::size_t size) {
         static_cast<void>(size);
         if (ptr) {
             VirtualFree(ptr, 0, MEM_RELEASE);
         }
-    } // static void HIDDEN__STD__2::os_free(void *ptr, std::size_t size)
-} // namespace HIDDEN__STD__2
+    }
+}
 
 #else
 
@@ -57,42 +45,47 @@ namespace HIDDEN__STD__2
         while (__atomic_test_and_set(&_memory_lock, __ATOMIC_ACQUIRE)) {
             // Spin
         }
-    } // static void HIDDEN__STD__2::memory_acquire_lock()
+    }
 
     static void memory_release_lock() {
         __atomic_clear(&_memory_lock, __ATOMIC_RELEASE);
-    } // static void HIDDEN__STD__2::memory_release_lock()
+    }
 
     static void *os_allocate(std::size_t size) {
         void *p = mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (p == static_cast<void *>(-1)) return 0;
         return p;
-    } // static void *HIDDEN__STD__2::os_allocate(std::size_t size)
+    }
 
     static void os_free(void *ptr, std::size_t size) {
         if (ptr && size > 0) {
             munmap(ptr, size);
         }
-    } // static void HIDDEN__STD__2::os_free(void *ptr, std::size_t size)
-} // namespace HIDDEN__STD__2
+    }
+}
 
 #endif
 
 namespace std
 {
+    struct MemoryHeader
+    {
+        void        *base_ptr;
+        std::size_t  size;
+    };
+
     #define _MEMORY_ALIGN 16
-    #define _MEMORY_HEADER_SIZE ((sizeof(std::size_t) + _MEMORY_ALIGN - 1) & ~(_MEMORY_ALIGN - 1))
+    #define _MEMORY_HEADER_SIZE (sizeof(MemoryHeader) + _MEMORY_ALIGN - 1 & ~(_MEMORY_ALIGN - 1))
 
     void copyMemory(void *const _chpDest, const void *const _chpSource, std::size_t _szSize)
     {
         unsigned char *d = static_cast<unsigned char *>(_chpDest);
         const unsigned char *s = static_cast<const unsigned char *>(_chpSource);
-        std::size_t idx = 0;
-        for (; idx < _szSize; idx++)
+        for (std::size_t idx = 0; idx < _szSize; idx++)
         {
             d[idx] = s[idx];
         }
-    } // void std::copyMemory(void *const _chpDest, const void *const _chpSource, std::size_t _szSize)
+    }
 
     void *moveMemory(void *const _chpDest, const void *const _chpSource, std::size_t _szSize)
     {
@@ -100,8 +93,7 @@ namespace std
         const unsigned char *s = static_cast<const unsigned char *>(_chpSource);
         if (d == s || _szSize == 0) return _chpDest;
         if (d < s) {
-            std::size_t idx = 0;
-            for (; idx < _szSize; idx++) {
+            for (std::size_t idx = 0; idx < _szSize; idx++) {
                 d[idx] = s[idx];
             }
         } else {
@@ -112,12 +104,13 @@ namespace std
             }
         }
         return _chpDest;
-    } // void *std::moveMemory(void *const _chpDest, const void *const _chpSource, std::size_t _szSize)
+    }
 
     void *allocateMemory(std::size_t _szSize)
     {
         if (_szSize == 0) _szSize = 1;
-        std::size_t total_size = _szSize + _MEMORY_HEADER_SIZE;
+        
+        std::size_t total_size = _szSize + sizeof(MemoryHeader) + _MEMORY_ALIGN;
         
         HIDDEN__STD__2::memory_acquire_lock();
         void *raw = HIDDEN__STD__2::os_allocate(total_size);
@@ -125,23 +118,38 @@ namespace std
             HIDDEN__STD__2::memory_release_lock();
             return 0;
         }
-        *(static_cast<std::size_t *>(raw)) = _szSize;
-        void *user_ptr = static_cast<void *>(static_cast<char *>(raw) + _MEMORY_HEADER_SIZE);
-        HIDDEN__STD__2::memory_release_lock();
+
+        // Use static_cast with char* arithmetic instead of reinterpret_cast
+        char *raw_char = static_cast<char *>(raw);
+        char *user_address = raw_char + sizeof(MemoryHeader);
         
-        return user_ptr;
-    } // void *std::allocateMemory(std::size_t _szSize)
+        // Address alignment calculation using pointer-to-integer conversion via ptrsize_t
+        std::size_t addr_val = static_cast<std::size_t>(static_cast<void *>(user_address));
+        std::size_t adjustment = _MEMORY_ALIGN - (addr_val & (_MEMORY_ALIGN - 1));
+        char *aligned_user_ptr = user_address + (adjustment == _MEMORY_ALIGN ? 0 : adjustment);
+
+        // Populate header fields immediately preceding the aligned user pointer
+        MemoryHeader *header = static_cast<MemoryHeader *>(static_cast<void *>(aligned_user_ptr)) - 1;
+        header->base_ptr = raw;
+        header->size = total_size;
+
+        HIDDEN__STD__2::memory_release_lock();
+        return static_cast<void *>(aligned_user_ptr);
+    }
 
     void freeMemory(void *const _chpPtr)
     {
         if (!_chpPtr) return;
         
         HIDDEN__STD__2::memory_acquire_lock();
-        char *raw = static_cast<char *>(_chpPtr) - _MEMORY_HEADER_SIZE;
-        std::size_t old_size = *(static_cast<std::size_t *>(raw));
-        HIDDEN__STD__2::os_free(raw, old_size + _MEMORY_HEADER_SIZE);
+        
+        MemoryHeader *header = static_cast<MemoryHeader *>(_chpPtr) - 1;
+        void *base = header->base_ptr;
+        std::size_t total_size = header->size;
+
+        HIDDEN__STD__2::os_free(base, total_size);
         HIDDEN__STD__2::memory_release_lock();
-    } // void std::freeMemory(void *const _chpPtr)
+    }
 
     void *reallocateMemory(void *const _chpPtr, std::size_t _szNewSize)
     {
@@ -154,8 +162,11 @@ namespace std
         }
 
         HIDDEN__STD__2::memory_acquire_lock();
-        char *old_raw = static_cast<char *>(_chpPtr) - _MEMORY_HEADER_SIZE;
-        std::size_t old_size = *(static_cast<std::size_t *>(old_raw));
+        MemoryHeader *header = static_cast<MemoryHeader *>(_chpPtr) - 1;
+        
+        char *ptr_char = static_cast<char *>(_chpPtr);
+        char *base_char = static_cast<char *>(header->base_ptr);
+        std::size_t old_size = header->size - (ptr_char - base_char);
         HIDDEN__STD__2::memory_release_lock();
 
         void *new_ptr = std::allocateMemory(_szNewSize);
@@ -167,7 +178,7 @@ namespace std
         std::freeMemory(_chpPtr);
 
         return new_ptr;
-    } // void *std::reallocateMemory(void *const _chpPtr, std::size_t _szNewSize)
-} // namespace std
+    }
+}
 
 #endif
