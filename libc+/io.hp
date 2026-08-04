@@ -5,6 +5,7 @@
 
 #include <types>
 #include <__utilities>
+#include <string>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -48,6 +49,79 @@ namespace std
         write(STDERR_FILENO, _chpString, _pszLength);
 #endif
     }
+
+    void get_stdin(char *const _chpBuffer, std::ptrsize_t _pszLength)
+    {
+#ifdef _WIN32
+        DWORD read_bytes = 0;
+
+        ReadFile(
+            GetStdHandle(STD_INPUT_HANDLE),
+            _chpBuffer,
+            static_cast<DWORD>(_pszLength),
+            &read_bytes,
+            nullptr
+        );
+#else
+        read(STDIN_FILENO, _chpBuffer, _pszLength);
+#endif
+    } // void std::get_stdin(char *const _chpBuffer, std::ptrsize_t _pszLength)
+
+    /**
+     * Reads a single character from stdin
+     **/
+    char getc()
+    {
+        char ch = '\0';
+        std::get_stdin(&ch, 1);
+        return ch;
+    } // char std::getc()
+
+    /**
+     * Reads a string stream up to a maximum length (wrapper around get_stdin with null termination)
+     **/
+    void gets(char *const _chpBuffer, std::ptrsize_t _pszMaxLength)
+    {
+        if (_pszMaxLength == 0) return;
+
+        // Read up to max length minus one to ensure space for null terminator
+        std::ptrsize_t bytesToRead = _pszMaxLength - 1;
+        std::get_stdin(_chpBuffer, bytesToRead);
+
+        // Null terminate whatever was read
+        for (std::ptrsize_t i = 0; i < bytesToRead; i++)
+        {
+            if (_chpBuffer[i] == '\n' || _chpBuffer[i] == '\r')
+            {
+                _chpBuffer[i] = '\0';
+                return;
+            }
+        }
+        _chpBuffer[bytesToRead] = '\0';
+    } // void std::gets(char *const _chpBuffer, std::ptrsize_t _pszMaxLength)
+
+    /**
+     * Reads dynamically from stdin until a newline is encountered, returning a self-contained std::String.
+     **/
+    String readDynamic()
+    {
+        String str = String::new();
+        char temp[2];
+        temp[1] = '\0';
+
+        while (true)
+        {
+            char ch = std::getc();
+            if (ch == '\0') break; // EOF or stream end
+
+            temp[0] = ch;
+            str.appendChars(temp);
+
+            if (ch == '\n') break;
+        }
+
+        return str;
+    } // String std::readDynamic()
 
     /**
      * Puts a string to stdout
