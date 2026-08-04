@@ -115,14 +115,6 @@ namespace std
             self->__len += appendLen;
         } // void std::String::appendChars(String *self, const char *const string)
 
-        void appendString(String *self, const String *const other)
-        {
-            if (!self || !other)
-                return;
-
-            self->appendChars(other->chars());
-        } // void std::String::appendString(String *self, const String *const other)
-
         const char *chars(const String *const self)
         {
             if (!self)
@@ -130,6 +122,14 @@ namespace std
 
             return self->__data;
         } // const char *std::String::chars(const String *const self)
+
+        void appendString(String *self, const String *const other)
+        {
+            if (!self || !other)
+                return;
+
+            self->appendChars(other->chars());
+        } // void std::String::appendString(String *self, const String *const other)
     } // struct String
 } // namespace std
 

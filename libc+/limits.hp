@@ -8,23 +8,23 @@
 namespace std
 {
     /* Unsigned integer max */
-    const std::uint8_t  uint8_max  = 255;                     // 256 - 1
-    const std::uint16_t uint16_max = 65535;                   // 65536 - 1
-    const std::uint32_t uint32_max = 4294967295;              // 4294967296 - 1
-    const std::uint64_t uint64_max = 18446744073709551615;    // 18446744073709551616 - 1
+    std::uint8_t  uint8_max  = 255;                     // 256 - 1
+    std::uint16_t uint16_max = 65535;                   // 65536 - 1
+    std::uint32_t uint32_max = 4294967295;              // 4294967296 - 1
+    std::uint64_t uint64_max = 18446744073709551615;    // 18446744073709551616 - 1
     // Unsigned range is: [0, max]
 
     /* Signed integer max */
-    const std::int8_t   int8_max   = 127;                     // 128 - 1
-    const std::int16_t  int16_max  = 32767;                   // 32768 - 1
-    const std::int32_t  int32_max  = 2147483647;              // 2147483648 - 1
-    const std::int64_t  int64_max  = 9223372036854775807;     // 9223372036854775808 - 1
+    std::int8_t   int8_max   = 127;                     // 128 - 1
+    std::int16_t  int16_max  = 32767;                   // 32768 - 1
+    std::int32_t  int32_max  = 2147483647;              // 2147483648 - 1
+    std::int64_t  int64_max  = 9223372036854775807;     // 9223372036854775808 - 1
 
     /* Signed integer min */
-    const std::int8_t   int8_min   = -std::int8_max  - 1;
-    const std::int16_t  int16_min  = -std::int16_max - 1;
-    const std::int32_t  int32_min  = -std::int32_max - 1;
-    const std::int64_t  int64_min  = -std::int64_max - 1;
+    std::int8_t   int8_min   = -127  - 1;
+    std::int16_t  int16_min  = -32767 - 1;
+    std::int32_t  int32_min  = -2147483647 - 1;
+    std::int64_t  int64_min  = -9223372036854775807 - 1;
     // Signed range is: [-max - 1, max]
 } // namespace std
 
