@@ -258,19 +258,26 @@ static Symbol *parse_resolved_type(Transpiler *t, const NamespaceStack *ns, size
 
     while (p < end && is_qualifier(at(t, p))) ++p;
     if (p < end && (token_is(at(t, p), "struct") || token_is(at(t, p), "enum"))) ++p;
+    
     q = read_qualified(t, p, end, &used);
     if (!q) return NULL;
+    
     type = resolve_name(&t->symbols, ns, q, SYM_TYPE | SYM_ENUM);
     free(q);
     if (!type) return NULL;
+    
     p += used;
-    if (pointer_depth) {
-        *pointer_depth = 0;
-        while (p < end && token_char(at(t, p), '*')) {
-            ++*pointer_depth;
-            ++p;
+    
+    if (pointer_depth) *pointer_depth = 0;
+    
+    /* Consume pointer asterisks and any trailing qualifiers (e.g., const T * const) */
+    while (p < end && (token_char(at(t, p), '*') || is_qualifier(at(t, p)))) {
+        if (token_char(at(t, p), '*')) {
+            if (pointer_depth) ++*pointer_depth;
         }
+        ++p;
     }
+    
     if (after) *after = p;
     return type;
 }
@@ -707,6 +714,71 @@ static void emit_value_receiver_call(Transpiler *t, NamespaceStack *ns, size_t b
     *pp = method_rparen + 1;
 }
 
+static bool try_emit_parenthesized_method_call(Transpiler *t, NamespaceStack *ns, size_t *pp, size_t end)
+{
+    size_t p = *pp, close, method_name, method_lparen, method_rparen;
+    char *name, *mn;
+    Symbol *type, *method;
+    int ptr = 0;
+    bool arrow = false;
+
+    if (at(t, p)->kind != TOK_LPAREN) return false;
+    close = matching(t, p, TOK_LPAREN, TOK_RPAREN, end);
+    if (close != p + 2 || close + 3 >= end) return false;
+    
+    if (at(t, close + 1)->kind == TOK_DOT) {
+        method_name = close + 2;
+        method_lparen = close + 3;
+    } else if (token_char(at(t, close + 1), '-') && at(t, close + 2)->kind == TOK_GT) {
+        arrow = true;
+        method_name = close + 3;
+        method_lparen = close + 4;
+        if (method_lparen >= end) return false;
+    } else {
+        return false;
+    }
+
+    if (at(t, method_name)->kind != TOK_IDENTIFIER || at(t, method_lparen)->kind != TOK_LPAREN) return false;
+
+    name = token_text(at(t, p + 1));
+    type = lookup_value(t, ns, name, &ptr);
+    if (!type) {
+        free(name);
+        return false;
+    }
+    
+    mn = token_text(at(t, method_name));
+    method = method_for(t, type->qualified_name, mn);
+    free(mn);
+    if (!method) {
+        free(name);
+        return false;
+    }
+    
+    if (arrow && ptr < 1) {
+        free(name);
+        die_at(at(t, p), "'->' method call requires a pointer receiver");
+    }
+
+    method_rparen = matching(t, method_lparen, TOK_LPAREN, TOK_RPAREN, end);
+    emit_ws(&t->output, at(t, p));
+    buffer_puts(&t->output, method->mangled_name);
+    buffer_putc(&t->output, '(');
+    
+    if (!method->is_static || method->receiver_pointer_depth > 0) {
+        /* Unconditionally prefix with & if dot syntax was used */
+        if (!arrow) buffer_putc(&t->output, '&');
+        buffer_puts(&t->output, name);
+        if (method_lparen + 1 < method_rparen) buffer_putc(&t->output, ',');
+    }
+    
+    emit_fragment(t, ns, method_lparen + 1, method_rparen);
+    buffer_putc(&t->output, ')');
+    free(name);
+    *pp = method_rparen + 1;
+    return true;
+}
+
 static bool try_emit_expression_method_call(Transpiler *t, NamespaceStack *ns, size_t *pp, size_t end)
 {
     size_t p = *pp, used = 0, receiver_end, op, method_name, method_lparen, method_rparen;
@@ -720,11 +792,14 @@ static bool try_emit_expression_method_call(Transpiler *t, NamespaceStack *ns, s
         free(q);
         return false;
     }
+    
     callee = resolve_name(&t->symbols, ns, q, SYM_FUNCTION | SYM_METHOD);
     free(q);
     if (!callee || !callee->type_qualified) return false;
+    
     receiver_end = matching(t, p + used, TOK_LPAREN, TOK_RPAREN, end) + 1;
     if (receiver_end >= end) return false;
+    
     if (at(t, receiver_end)->kind == TOK_DOT) {
         op = receiver_end;
         method_name = receiver_end + 1;
@@ -737,20 +812,29 @@ static bool try_emit_expression_method_call(Transpiler *t, NamespaceStack *ns, s
     } else {
         return false;
     }
+    
     (void)op;
     if (method_lparen >= end || at(t, method_name)->kind != TOK_IDENTIFIER || at(t, method_lparen)->kind != TOK_LPAREN) return false;
+    
     type = symbol_exact(&t->symbols, callee->type_qualified, SYM_TYPE);
     if (!type) return false;
+    
     mn = token_text(at(t, method_name));
     method = method_for(t, type->qualified_name, mn);
     free(mn);
     if (!method) return false;
+    
     method_rparen = matching(t, method_lparen, TOK_LPAREN, TOK_RPAREN, end);
     if (arrow && callee->pointer_depth < 1) die_at(at(t, p), "'->' method call requires a pointer expression");
+    
     if (callee->pointer_depth > 0 && (!method->is_static || method->receiver_pointer_depth > 0)) {
         emit_ws(&t->output, at(t, p));
         buffer_puts(&t->output, method->mangled_name);
         buffer_putc(&t->output, '(');
+        
+        /* Unconditionally prefix with & if dot syntax was used */
+        if (!arrow) buffer_putc(&t->output, '&');
+        
         emit_fragment_without_first_ws(t, ns, p, receiver_end);
         if (method_lparen + 1 < method_rparen) buffer_putc(&t->output, ',');
         emit_fragment(t, ns, method_lparen + 1, method_rparen);
@@ -758,48 +842,9 @@ static bool try_emit_expression_method_call(Transpiler *t, NamespaceStack *ns, s
         *pp = method_rparen + 1;
         return true;
     }
+    
+    /* Fallback for value receiver blocks */
     emit_value_receiver_call(t, ns, p, receiver_end, type, method, method_lparen, method_rparen, pp);
-    return true;
-}
-
-static bool try_emit_parenthesized_method_call(Transpiler *t, NamespaceStack *ns, size_t *pp, size_t end)
-{
-    size_t p = *pp, close, method_name, method_lparen, method_rparen;
-    char *name, *mn;
-    Symbol *type, *method;
-    int ptr = 0;
-
-    if (at(t, p)->kind != TOK_LPAREN) return false;
-    close = matching(t, p, TOK_LPAREN, TOK_RPAREN, end);
-    if (close != p + 2 || close + 3 >= end || at(t, close + 1)->kind != TOK_DOT || at(t, close + 2)->kind != TOK_IDENTIFIER || at(t, close + 3)->kind != TOK_LPAREN) return false;
-    name = token_text(at(t, p + 1));
-    type = lookup_value(t, ns, name, &ptr);
-    if (!type) {
-        free(name);
-        return false;
-    }
-    method_name = close + 2;
-    method_lparen = close + 3;
-    mn = token_text(at(t, method_name));
-    method = method_for(t, type->qualified_name, mn);
-    free(mn);
-    if (!method) {
-        free(name);
-        return false;
-    }
-    method_rparen = matching(t, method_lparen, TOK_LPAREN, TOK_RPAREN, end);
-    emit_ws(&t->output, at(t, p));
-    buffer_puts(&t->output, method->mangled_name);
-    buffer_putc(&t->output, '(');
-    if (!method->is_static || method->receiver_pointer_depth > 0) {
-        if (ptr == 0) buffer_putc(&t->output, '&');
-        buffer_puts(&t->output, name);
-        if (method_lparen + 1 < method_rparen) buffer_putc(&t->output, ',');
-    }
-    emit_fragment(t, ns, method_lparen + 1, method_rparen);
-    buffer_putc(&t->output, ')');
-    free(name);
-    *pp = method_rparen + 1;
     return true;
 }
 
@@ -1304,6 +1349,7 @@ static bool try_emit_method_call(Transpiler *t, NamespaceStack *ns, size_t *pp, 
     bool arrow = false, pass_receiver;
 
     if (x->kind != TOK_IDENTIFIER || p + 3 >= end) return false;
+    
     if (at(t, p + 1)->kind == TOK_DOT) {
         op = p + 1;
         method = p + 2;
@@ -1317,14 +1363,17 @@ static bool try_emit_method_call(Transpiler *t, NamespaceStack *ns, size_t *pp, 
     } else {
         return false;
     }
+    
     (void)op;
     if (at(t, method)->kind != TOK_IDENTIFIER || at(t, lp)->kind != TOK_LPAREN) return false;
+    
     receiver = token_text(x);
     type = lookup_value(t, ns, receiver, &ptr);
     if (!type) {
         free(receiver);
         return false;
     }
+    
     mn = token_text(at(t, method));
     m = method_for(t, type->qualified_name, mn);
     free(mn);
@@ -1332,22 +1381,28 @@ static bool try_emit_method_call(Transpiler *t, NamespaceStack *ns, size_t *pp, 
         free(receiver);
         return false;
     }
+    
     if (arrow && ptr < 1) {
         free(receiver);
         die_at(x, "'->' method call requires a pointer receiver");
     }
+    
     pass_receiver = !m->is_static || m->receiver_pointer_depth > 0;
     if (pass_receiver && m->receiver_pointer_depth > 0 && (ptr ? ptr : 1) != m->receiver_pointer_depth) {
         warn_at(x, "receiver pointer depth differs from the method's declared receiver; generated C may warn");
     }
+    
     emit_ws(&t->output, x);
     buffer_puts(&t->output, m->mangled_name);
     buffer_putc(&t->output, '(');
+    
     if (pass_receiver) {
-        if (ptr == 0) buffer_putc(&t->output, '&');
+        /* Unconditionally prefix with & if dot syntax was used */
+        if (!arrow) buffer_putc(&t->output, '&');
         buffer_puts(&t->output, receiver);
         if (at(t, lp + 1)->kind != TOK_RPAREN) buffer_putc(&t->output, ',');
     }
+    
     free(receiver);
     *pp = lp + 1;
     return true;

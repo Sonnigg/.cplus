@@ -4,9 +4,7 @@
 #include <types>
 #include <io>
 #include <chars>
-
-// for now because of malloc, realloc, and free
-#include <stdlib.h>
+#include <memory>
 
 namespace HIDDEN__STD__1
 {
@@ -23,7 +21,7 @@ namespace std
 
         static String new()
         {
-            char *ptr = static_cast<char *>(malloc(sizeof(char) * HIDDEN__STD__1::INIT_LENGTH));
+            char *ptr = static_cast<char *>(std::allocateMemory(sizeof(char) * HIDDEN__STD__1::INIT_LENGTH));
 
             if (!ptr)
             {
@@ -51,7 +49,7 @@ namespace std
 
             std::size_t length = std::stringLengthWithNull(string);
 
-            char *ptr = static_cast<char *>(malloc(sizeof(char) * length));
+            char *ptr = static_cast<char *>(std::allocateMemory(sizeof(char) * length));
 
             if (!ptr)
             {
@@ -76,7 +74,7 @@ namespace std
             if (!self)
                 return;
 
-            free(self->__data);
+            std::freeMemory(self->__data);
 
             self->__data = nullptr;
             self->__len  = 0;
@@ -99,7 +97,7 @@ namespace std
                     newCap *= 2;
 
                 char *ptr = static_cast<char *>(
-                    realloc(self->__data, sizeof(char) * newCap)
+                    std::reallocateMemory(self->__data, sizeof(char) * newCap)
                 );
 
                 if (!ptr)
