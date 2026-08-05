@@ -2,7 +2,7 @@
 #define _STRING_HP
 
 #include <types>
-#include <io>
+#include <internal/_io>
 #include <chars>
 #include <memory>
 

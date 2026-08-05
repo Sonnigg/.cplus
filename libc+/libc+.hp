@@ -12,7 +12,7 @@
 #endif // #ifdef _WIN32
 
 #include <io>
-#include <__utilities>
+#include <internal/_utilities>
 #include <types>
 
 namespace std

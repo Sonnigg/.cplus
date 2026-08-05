@@ -1,12 +1,11 @@
-// io.hp
+// _io.hp
 
-// subset of _io.hp that introduces std::String returning functions
+// IO stub for non-String behaviour functions, also implemented fully in io.hp
 
 #ifndef __IO_HP
 #define __IO_HP
 
 #include <types>
-#include <internal/_io>
 #include <internal/_utilities>
 #include <memory>
 
@@ -358,14 +357,3 @@ namespace std
 } // namespace std
 
 #endif // #ifndef __IO_HP
-
-#ifndef _IO_HP
-#define _IO_HP
-#include <string>
-
-namespace std
-{
-    // whatever to put in here later on
-}
-
-#endif // #ifndef _IO_HP
