@@ -10,6 +10,7 @@
 | structs::methods                | 2026-08-03 | 2026-08-03    |
 | enums                           | 2026-08-03 | 2026-08-03    |
 | enums::variants                 | 2026-08-03 | 2026-08-03    |
+| defer                           | 2026-08-05 | 2026-08-05    |
 
 # STATUS - WIP (1st August 2026)
 
@@ -255,3 +256,14 @@ int main()
 }
 ```
 > Thing::thing1 would be 0, though this can be overriden by using VARIANT = INTEGER instead.
+
+## About C+'s defer (5th August 2026)
+C+ introduces `defer` into low-level systems programming which acts as almost a manual RAII approach. When defer is used, following the below shown syntax, the code in the "defer block" (`defer { ... }`, inside the curly braces is what the "defer block" refers to) is moved to the end of the lexical scope directly above the closing brace and also moved right before every possible `return` in the scope or child-scopes.
+
+`defer` syntax
+```cx
+defer {
+    foo(); // cleanup code following the above specified rules
+}
+```
+> `defer foo();` will **not** work in any way, as `defer` strictly requires a scope after it.
