@@ -1,8 +1,8 @@
 // __utilities.hp
 
 
-#ifndef ___UTILITIES_HP
-#define ___UTILITIES_HP
+#ifndef __UTILITIES_HP
+#define __UTILITIES_HP
 
 #include <types>
 
@@ -29,4 +29,4 @@ namespace std
     } // std::size_t std::_chpLengthPadding(const char *const _chpString)
 } // namespace std
 
-#endif // #ifndef ___UTILITIES_HP
+#endif // #ifndef __UTILITIES_HP
