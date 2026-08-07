@@ -142,8 +142,8 @@ namespace std
 
     struct StringView
     {
-        const char  *__data;
-        std::size_t __len ; // fucking hell, nevermind, no pointer to an std::size_t, just a length of the INITIAL creation
+        const char *const __data;
+        std::size_t       __len ; // fucking hell, nevermind, no pointer to an std::size_t, just a length of the INITIAL creation
 
         static StringView fromChars(const char *const _chpString)
         {
