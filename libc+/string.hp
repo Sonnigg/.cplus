@@ -124,6 +124,13 @@ namespace std
             return self->__data;
         } // const char *std::String::chars(const std::String *const self)
 
+        const std::size_t length(const String *const self)
+        {
+            if (!self)
+                return nullptr;
+            return self->__len;
+        }
+
         void appendString(String *self, const String *const other)
         {
             if (!self || !other)
@@ -135,8 +142,8 @@ namespace std
 
     struct StringView
     {
-        const char *__data;
-        std::size_t __len ;
+        const char  *__data;
+        std::size_t *__len ; // points to a std::size_t to dynamically update __len
 
         static StringView fromChars(const char *const _chpString)
         {
@@ -146,12 +153,27 @@ namespace std
             };
         } // static std::StringView std::StringView::fromChars(const char *const _chpString)
 
+        static StringView fromString(const String *const _strpString)
+        {
+            return StringView {
+                __data: _strpString->__data,
+                __len : &_strpString->__len,
+            };
+        }
+
         const char *chars(const StringView *const self)
         {
             if (!self)
                 return nullptr;
             return self->__data;
         } // const char *std::StringView::chars(const std::Stringview *const self)
+
+        const std::size_t length(const StringView *const self)
+        {
+            if (!self)
+                return nullptr;
+            return *(self->__len);
+        }
     } // struct StringView
 } // namespace std
 
