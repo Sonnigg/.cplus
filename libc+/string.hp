@@ -127,7 +127,7 @@ namespace std
         const std::size_t length(const String *const self)
         {
             if (!self)
-                return nullptr;
+                return 0;
             return self->__len;
         }
 
@@ -149,7 +149,7 @@ namespace std
         {
             return StringView {
                 __data: _chpString,
-                __len : std::stringLength(_chpString),
+                __len : &std::stringLength(_chpString),
             };
         } // static std::StringView std::StringView::fromChars(const char *const _chpString)
 
@@ -171,7 +171,7 @@ namespace std
         const std::size_t length(const StringView *const self)
         {
             if (!self)
-                return nullptr;
+                return 0;
             return *(self->__len);
         }
     } // struct StringView
