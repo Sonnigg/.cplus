@@ -270,7 +270,6 @@ static Symbol *parse_resolved_type(Transpiler *t, const NamespaceStack *ns, size
     
     if (pointer_depth) *pointer_depth = 0;
     
-    /* Consume pointer asterisks and any trailing qualifiers (e.g., const T * const) */
     while (p < end && (token_char(at(t, p), '*') || is_qualifier(at(t, p)))) {
         if (token_char(at(t, p), '*')) {
             if (pointer_depth) ++*pointer_depth;
@@ -430,12 +429,18 @@ static void discover_struct(Transpiler *t, NamespaceStack *ns, size_t start, siz
                     char *field = token_text(at(t, name));
                     Buffer b;
                     char *q;
+                    int ptr = 0;
+                    size_t after_type;
+                    
+                    Symbol *type = parse_resolved_type(t, ns, p, name, &after_type, &ptr);
+                    
                     buffer_init(&b);
                     buffer_puts(&b, owner->qualified_name);
                     buffer_puts(&b, "::");
                     buffer_puts(&b, field);
                     q = b.data;
-                    symbols_add(&t->symbols, q, SYM_FIELD, owner->qualified_name, NULL, 0, false);
+                    
+                    symbols_add(&t->symbols, q, SYM_FIELD, owner->qualified_name, type ? type->qualified_name : NULL, ptr, false);
                     free(field);
                     free(q);
                 }
@@ -479,14 +484,41 @@ static void discover_range(Transpiler *t, NamespaceStack *ns, size_t begin, size
             if (p < end && at(t, p)->kind == TOK_SEMICOLON) ++p;
             continue;
         }
+        if (token_is(x, "struct") && p + 1 < end && at(t, p + 1)->kind == TOK_IDENTIFIER && p + 2 < end && at(t, p + 2)->kind == TOK_SEMICOLON) {
+            char *name = token_text(at(t, p + 1)), *q = qualify(ns, ns->count, name);
+            symbols_add(&t->symbols, q, SYM_TYPE, NULL, NULL, 0, false);
+            free(name);
+            free(q);
+            p += 3;
+            continue;
+        }
+        if (token_is(x, "enum") && p + 1 < end && at(t, p + 1)->kind == TOK_IDENTIFIER && p + 2 < end && at(t, p + 2)->kind == TOK_SEMICOLON) {
+            char *name = token_text(at(t, p + 1)), *q = qualify(ns, ns->count, name);
+            symbols_add(&t->symbols, q, SYM_ENUM, NULL, NULL, 0, false);
+            free(name);
+            free(q);
+            p += 3;
+            continue;
+        }
         if (parse_callable(t, p, end, &c)) {
-            if (c.name == 0 || at(t, c.name - 1)->kind != TOK_SCOPE) {
-                char *name = token_text(at(t, c.name)), *q = qualify(ns, ns->count, name);
+            size_t q_start = c.name;
+            while (q_start >= 2 && at(t, q_start - 1)->kind == TOK_SCOPE && at(t, q_start - 2)->kind == TOK_IDENTIFIER) {
+                q_start -= 2;
+            }
+            {
+                size_t used = 0;
+                char *q_name = read_qualified(t, q_start, c.name + 1, &used);
+                char *q = qualify(ns, ns->count, q_name);
                 size_t ignored;
                 int return_depth = 0;
-                Symbol *return_type = parse_resolved_type(t, ns, p, c.name, &ignored, &return_depth);
-                symbols_add(&t->symbols, q, SYM_FUNCTION, NULL, return_type ? return_type->qualified_name : NULL, return_depth, c.is_static);
-                free(name);
+                Symbol *return_type = parse_resolved_type(t, ns, p, q_start, &ignored, &return_depth);
+                
+                // Determine if it is a method or function based on qualification depth / type owner
+                Symbol *existing = symbol_exact(&t->symbols, q, SYM_FUNCTION | SYM_METHOD);
+                if (!existing) {
+                    symbols_add(&t->symbols, q, q_start > 0 ? SYM_METHOD : SYM_FUNCTION, NULL, return_type ? return_type->qualified_name : NULL, return_depth, c.is_static);
+                }
+                free(q_name);
                 free(q);
             }
             p = c.after;
@@ -766,7 +798,6 @@ static bool try_emit_parenthesized_method_call(Transpiler *t, NamespaceStack *ns
     buffer_putc(&t->output, '(');
     
     if (!method->is_static || method->receiver_pointer_depth > 0) {
-        /* Unconditionally prefix with & if dot syntax was used */
         if (!arrow) buffer_putc(&t->output, '&');
         buffer_puts(&t->output, name);
         if (method_lparen + 1 < method_rparen) buffer_putc(&t->output, ',');
@@ -832,7 +863,6 @@ static bool try_emit_expression_method_call(Transpiler *t, NamespaceStack *ns, s
         buffer_puts(&t->output, method->mangled_name);
         buffer_putc(&t->output, '(');
         
-        /* Unconditionally prefix with & if dot syntax was used */
         if (!arrow) buffer_putc(&t->output, '&');
         
         emit_fragment_without_first_ws(t, ns, p, receiver_end);
@@ -843,7 +873,6 @@ static bool try_emit_expression_method_call(Transpiler *t, NamespaceStack *ns, s
         return true;
     }
     
-    /* Fallback for value receiver blocks */
     emit_value_receiver_call(t, ns, p, receiver_end, type, method, method_lparen, method_rparen, pp);
     return true;
 }
@@ -905,18 +934,12 @@ static bool try_emit_defer_block(Transpiler *t, NamespaceStack *ns, size_t *pp, 
     open = p + 1;
     close = matching(t, open, TOK_LBRACE, TOK_RBRACE, end);
     
-    // Find the nearest active defer stack frame. 
     scope = defer_stack_current(&t->defers);
     if (!scope) return false;
 
-    // Isolate the output of the defer body.
     buffer_init(&emitted);
     emit_fragment_to_buffer(&emitted, t, ns, open + 1, close);
 
-    // Save it into the current scope, but do NOT write it to the main output yet.
-    // In a Go-like defer, these execute in LIFO order, so we prepend or just append
-    // and reverse later when writing.
-    // For simplicity, we append here.
     buffer_puts(&scope->output, emitted.data);
     
     buffer_free(&emitted);
@@ -930,15 +953,11 @@ static void emit_fragment_with_substitution(Transpiler *t, NamespaceStack *ns, s
     size_t p = begin;
     while (p < end) {
         Token *x = at(t, p);
-        
-        /* Intercept the predicate placeholder */
         if (x->kind == TOK_IDENTIFIER && token_is(x, "_")) {
             emit_ws(&t->output, x);
             buffer_puts(&t->output, "__switch_value");
             ++p;
         } else {
-            /* Delegate to the main transpiler loop to properly resolve namespaces, 
-               structs, variables, and function calls */
             emit_one(t, ns, &p, end);
         }
     }
@@ -990,7 +1009,6 @@ static void emit_case_expr_primary(Transpiler *t, NamespaceStack *ns, size_t beg
     int d = 0;
     size_t k;
 
-    /* Strip outer matching parentheses if the entire primary expression is enclosed in (...) */
     while (begin + 1 < end && at(t, begin)->kind == TOK_LPAREN) {
         size_t match = matching(t, begin, TOK_LPAREN, TOK_RPAREN, end);
         if (match == end - 1) {
@@ -1002,7 +1020,6 @@ static void emit_case_expr_primary(Transpiler *t, NamespaceStack *ns, size_t beg
     }
     if (begin >= end) return;
 
-    /* Search for range operator => or ==> at top level (depth 0) */
     d = 0;
     for (k = begin; k < end; ++k) {
         Token *z = at(t, k);
@@ -1258,9 +1275,6 @@ static bool try_emit_switch(Transpiler *t, NamespaceStack *ns, size_t *pp, size_
             buffer_puts(&t->output, ") { ");
             saw_case = true;
 
-            /* * Find the end of this case block by tracking depth.
-             * This ensures a nested switch doesn't accidentally terminate this block.
-             */
             j = colon + 1;
             d = 0;
             while (j < body_close) {
@@ -1275,7 +1289,6 @@ static bool try_emit_switch(Transpiler *t, NamespaceStack *ns, size_t *pp, size_
                 ++j;
             }
 
-            /* Delegate back to the transpiler to properly resolve namespaces, variables, etc. */
             emit_fragment(t, ns, colon + 1, j);
             
             buffer_puts(&t->output, " } ");
@@ -1303,7 +1316,6 @@ static bool try_emit_switch(Transpiler *t, NamespaceStack *ns, size_t *pp, size_
                     ++j;
                 }
 
-                /* Delegate back to the transpiler */
                 emit_fragment(t, ns, colon + 1, j);
 
                 buffer_puts(&t->output, " } ");
@@ -1341,50 +1353,89 @@ static bool try_emit_header_include(Transpiler *t, size_t *pp)
 
 static bool try_emit_method_call(Transpiler *t, NamespaceStack *ns, size_t *pp, size_t end)
 {
-    size_t p = *pp, op, method, lp;
+    size_t p = *pp, scan = p;
     Token *x = at(t, p);
-    char *receiver, *mn;
-    Symbol *type, *m;
+    char *mn;
+    Symbol *current_type, *m;
     int ptr = 0;
     bool arrow = false, pass_receiver;
 
-    if (x->kind != TOK_IDENTIFIER || p + 3 >= end) return false;
+    if (x->kind != TOK_IDENTIFIER) return false;
     
-    if (at(t, p + 1)->kind == TOK_DOT) {
-        op = p + 1;
-        method = p + 2;
-        lp = p + 3;
-    } else if (token_char(at(t, p + 1), '-') && at(t, p + 2)->kind == TOK_GT) {
-        arrow = true;
-        op = p + 1;
-        method = p + 3;
-        lp = p + 4;
-        if (lp >= end) return false;
-    } else {
-        return false;
+    {
+        char *base_name = token_text(x);
+        current_type = lookup_value(t, ns, base_name, &ptr);
+        free(base_name);
     }
     
-    (void)op;
-    if (at(t, method)->kind != TOK_IDENTIFIER || at(t, lp)->kind != TOK_LPAREN) return false;
+    if (!current_type) return false;
     
-    receiver = token_text(x);
-    type = lookup_value(t, ns, receiver, &ptr);
-    if (!type) {
-        free(receiver);
-        return false;
+    scan++;
+    
+    while (scan < end) {
+        bool is_dot = at(t, scan)->kind == TOK_DOT;
+        bool is_arrow = token_char(at(t, scan), '-') && scan + 1 < end && at(t, scan + 1)->kind == TOK_GT;
+        
+        if (is_dot || is_arrow) {
+            size_t op_len = is_arrow ? 2 : 1;
+            if (scan + op_len < end && at(t, scan + op_len)->kind == TOK_IDENTIFIER) {
+                if (scan + op_len + 1 < end && at(t, scan + op_len + 1)->kind == TOK_LPAREN) {
+                    arrow = is_arrow;
+                    break;
+                }
+            }
+        }
+        
+        if (is_dot) {
+            if (scan + 1 >= end || at(t, scan + 1)->kind != TOK_IDENTIFIER) return false;
+            char *field = token_text(at(t, scan + 1));
+            Symbol *fsym = field_for(t, current_type->qualified_name, field);
+            free(field);
+            
+            if (!fsym || !fsym->type_qualified) return false;
+            current_type = symbol_exact(&t->symbols, fsym->type_qualified, SYM_TYPE | SYM_ENUM);
+            if (!current_type) return false;
+            
+            ptr = fsym->pointer_depth;
+            scan += 2;
+        } else if (is_arrow) {
+            if (ptr < 1) return false;
+            if (scan + 2 >= end || at(t, scan + 2)->kind != TOK_IDENTIFIER) return false;
+            char *field = token_text(at(t, scan + 2));
+            Symbol *fsym = field_for(t, current_type->qualified_name, field);
+            free(field);
+            
+            if (!fsym || !fsym->type_qualified) return false;
+            current_type = symbol_exact(&t->symbols, fsym->type_qualified, SYM_TYPE | SYM_ENUM);
+            if (!current_type) return false;
+            
+            ptr = fsym->pointer_depth;
+            scan += 3;
+        } else if (at(t, scan)->kind == TOK_LBRACKET) {
+            size_t rbracket = matching(t, scan, TOK_LBRACKET, TOK_RBRACKET, end);
+            if (rbracket >= end) return false;
+            if (ptr > 0) ptr--;
+            scan = rbracket + 1;
+        } else {
+            return false;
+        }
     }
+    
+    if (scan >= end) return false;
+    
+    size_t op = scan;
+    size_t method = op + (arrow ? 2 : 1);
+    size_t lp = method + 1;
+    size_t rp = matching(t, lp, TOK_LPAREN, TOK_RPAREN, end);
     
     mn = token_text(at(t, method));
-    m = method_for(t, type->qualified_name, mn);
+    m = method_for(t, current_type->qualified_name, mn);
     free(mn);
-    if (!m) {
-        free(receiver);
-        return false;
-    }
+    
+    if (!m) return false;
     
     if (arrow && ptr < 1) {
-        free(receiver);
-        die_at(x, "'->' method call requires a pointer receiver");
+        die_at(at(t, op), "'->' method call requires a pointer receiver");
     }
     
     pass_receiver = !m->is_static || m->receiver_pointer_depth > 0;
@@ -1397,14 +1448,15 @@ static bool try_emit_method_call(Transpiler *t, NamespaceStack *ns, size_t *pp, 
     buffer_putc(&t->output, '(');
     
     if (pass_receiver) {
-        /* Unconditionally prefix with & if dot syntax was used */
         if (!arrow) buffer_putc(&t->output, '&');
-        buffer_puts(&t->output, receiver);
-        if (at(t, lp + 1)->kind != TOK_RPAREN) buffer_putc(&t->output, ',');
+        emit_fragment_without_first_ws(t, ns, p, op);
+        if (lp + 1 < rp) buffer_putc(&t->output, ',');
     }
     
-    free(receiver);
-    *pp = lp + 1;
+    emit_fragment(t, ns, lp + 1, rp);
+    buffer_putc(&t->output, ')');
+    
+    *pp = rp + 1;
     return true;
 }
 
@@ -1425,13 +1477,10 @@ static void emit_one(Transpiler *t, NamespaceStack *ns, size_t *pp, size_t end)
     if (try_emit_switch(t, ns, pp, end)) return;
     if (try_emit_header_include(t, pp)) return;
 
-/* --- NEW GO-LIKE DEFER LOGIC --- */
     if (x->kind == TOK_IDENTIFIER && token_is(x, "return")) {
-        // Emit whitespace for the return first so formatting stays clean
         emit_ws(&t->output, x);
         
         if (t->defers.count > 0) {
-            // Pre-check if any defer scope actually has non-whitespace content
             bool has_defer_content = false;
             for (size_t d = t->defers.count; d > 0; --d) {
                 if (buffer_has_non_whitespace(&t->defers.items[d - 1].output)) {
@@ -1440,7 +1489,6 @@ static void emit_one(Transpiler *t, NamespaceStack *ns, size_t *pp, size_t end)
                 }
             }
 
-            // Only emit the block if we have actual code to write
             if (has_defer_content) {
                 buffer_puts(&t->output, "{ ");
                 for (size_t d = t->defers.count; d > 0; --d) {
@@ -1453,12 +1501,10 @@ static void emit_one(Transpiler *t, NamespaceStack *ns, size_t *pp, size_t end)
             }
         }
 
-        // Now actually write the word 'return'
         buffer_puts(&t->output, "return");
         ++*pp;
         return;
     }
-    /* ------------------------------- */
 
     if (looks_like_c_style_cast(t, ns, p, end)) {
         warn_at(x, "C-style cast; prefer static_cast<Type>(expression)");
@@ -1614,7 +1660,6 @@ static void emit_body(Transpiler *t, NamespaceStack *ns, size_t begin, size_t cl
         if (at(t, p)->kind == TOK_RBRACE) {
             DeferScope *scope = defer_stack_current(&t->defers);
             
-            // STRICT CHECK: Only dump if there is actual deferred code
             if (buffer_has_non_whitespace(&scope->output)) {
                 buffer_puts(&t->output, scope->output.data);
             }
@@ -1630,11 +1675,9 @@ static void emit_body(Transpiler *t, NamespaceStack *ns, size_t begin, size_t cl
         emit_one(t, ns, &p, close);
     }
     
-    // Catch any final defers at the very end of the function body
     if (t->defers.count) {
         DeferScope *scope = defer_stack_current(&t->defers);
         
-        // STRICT CHECK: Only dump if there is actual deferred code
         if (buffer_has_non_whitespace(&scope->output)) {
             buffer_puts(&t->output, scope->output.data);
         }
@@ -1646,12 +1689,39 @@ static void emit_body(Transpiler *t, NamespaceStack *ns, size_t begin, size_t cl
 static void transpile_function(Transpiler *t, NamespaceStack *ns, size_t start, const Callable *c)
 {
     size_t p = start, mark = locals_mark(&t->locals);
+    
+    size_t q_start = c->name;
+    while (q_start >= 2 && at(t, q_start - 1)->kind == TOK_SCOPE && at(t, q_start - 2)->kind == TOK_IDENTIFIER) {
+        q_start -= 2;
+    }
+    size_t used = 0;
+    char *q_name = read_qualified(t, q_start, c->name + 1, &used);
+    char *q = qualify(ns, ns->count, q_name);
+    Symbol *sym = symbol_exact(&t->symbols, q, SYM_FUNCTION | SYM_METHOD);
+
     add_parameters(t, ns, c->lparen + 1, c->rparen, NULL, NULL, false, at(t, c->name));
-    while (p < c->body) emit_one(t, ns, &p, c->body);
+    
+    while (p < c->body) {
+        if (p == start && c->is_static && token_is(at(t, p), "static")) {
+            ++p;
+            continue;
+        }
+        if (p >= q_start && p <= c->name) {
+            if (p == q_start) {
+                emit_ws(&t->output, at(t, p));
+                buffer_puts(&t->output, sym ? sym->mangled_name : q_name);
+            }
+            p++;
+            continue;
+        }
+        emit_one(t, ns, &p, c->body);
+    }
     emit_full(&t->output, at(t, c->body));
     emit_body(t, ns, c->body + 1, c->close);
     emit_full(&t->output, at(t, c->close));
     locals_restore(&t->locals, mark);
+    free(q_name);
+    free(q);
 }
 
 static void transpile_method(Transpiler *t, NamespaceStack *ns, size_t start, const Callable *c, Symbol *owner, Symbol *method)
@@ -1781,6 +1851,37 @@ static void transpile_enum(Transpiler *t, NamespaceStack *ns, size_t start, size
     free(q);
 }
 
+static void transpile_function_decl(Transpiler *t, NamespaceStack *ns, size_t start, const Callable *c)
+{
+    size_t p = start;
+    size_t q_start = c->name;
+    while (q_start >= 2 && at(t, q_start - 1)->kind == TOK_SCOPE && at(t, q_start - 2)->kind == TOK_IDENTIFIER) {
+        q_start -= 2;
+    }
+    size_t used = 0;
+    char *q_name = read_qualified(t, q_start, c->name + 1, &used);
+    char *q = qualify(ns, ns->count, q_name);
+    Symbol *sym = symbol_exact(&t->symbols, q, SYM_FUNCTION | SYM_METHOD);
+    
+    while (p < c->after) {
+        if (p == start && c->is_static && token_is(at(t, p), "static")) {
+            ++p;
+            continue;
+        }
+        if (p >= q_start && p <= c->name) {
+            if (p == q_start) {
+                emit_ws(&t->output, at(t, p));
+                buffer_puts(&t->output, sym ? sym->mangled_name : q_name);
+            }
+            p++;
+            continue;
+        }
+        emit_one(t, ns, &p, c->after);
+    }
+    free(q_name);
+    free(q);
+}
+
 static void transpile_range(Transpiler *t, NamespaceStack *ns, size_t begin, size_t end)
 {
     size_t p = begin;
@@ -1809,8 +1910,40 @@ static void transpile_range(Transpiler *t, NamespaceStack *ns, size_t begin, siz
             if (p < end && at(t, p)->kind == TOK_SEMICOLON) ++p;
             continue;
         }
-        if (parse_callable(t, p, end, &c) && c.body < end) {
-            transpile_function(t, ns, p, &c);
+        if (token_is(x, "struct") && p + 1 < end && at(t, p + 1)->kind == TOK_IDENTIFIER && p + 2 < end && at(t, p + 2)->kind == TOK_SEMICOLON) {
+            char *name = token_text(at(t, p + 1)), *q = qualify(ns, ns->count, name);
+            Symbol *owner = symbol_exact(&t->symbols, q, SYM_TYPE);
+            emit_ws(&t->output, x);
+            buffer_puts(&t->output, "typedef struct ");
+            buffer_puts(&t->output, owner ? owner->mangled_name : name);
+            buffer_puts(&t->output, " ");
+            buffer_puts(&t->output, owner ? owner->mangled_name : name);
+            buffer_puts(&t->output, ";");
+            free(name);
+            free(q);
+            p += 3;
+            continue;
+        }
+        if (token_is(x, "enum") && p + 1 < end && at(t, p + 1)->kind == TOK_IDENTIFIER && p + 2 < end && at(t, p + 2)->kind == TOK_SEMICOLON) {
+            char *name = token_text(at(t, p + 1)), *q = qualify(ns, ns->count, name);
+            Symbol *owner = symbol_exact(&t->symbols, q, SYM_ENUM);
+            emit_ws(&t->output, x);
+            buffer_puts(&t->output, "typedef enum ");
+            buffer_puts(&t->output, owner ? owner->mangled_name : name);
+            buffer_puts(&t->output, " ");
+            buffer_puts(&t->output, owner ? owner->mangled_name : name);
+            buffer_puts(&t->output, ";");
+            free(name);
+            free(q);
+            p += 3;
+            continue;
+        }
+        if (parse_callable(t, p, end, &c)) {
+            if (c.body < end) {
+                transpile_function(t, ns, p, &c);
+            } else {
+                transpile_function_decl(t, ns, p, &c);
+            }
             p = c.after;
             continue;
         }
@@ -1837,8 +1970,14 @@ void transpile(Transpiler *t)
     buffer_puts(&t->output, "#ifndef true\r\n#define true 1\r\n#endif\r\n#ifndef false\r\n#define false 0\r\n#endif\r\n\r\n");
     buffer_puts(&t->output, 
     "#ifndef bool\r\n"
+    "#if CMPL__PTR_SIZE == 8\r\n"
+    "#define bool unsigned int\r\n"
+    "#elif CMPL__PTR_SIZE == 4\r\n"
+    "#define bool unsigned short\r\n"
+    "#else\r\n"
     "#define bool unsigned char\r\n"
-    "#endif\r\n\r\n");
+    "#endif\r\n"
+    "#endif // #ifndef bool\r\n\r\n");
 #else
     buffer_puts(&t->output, "/* Generated by C+ compiler. DO NOT EDIT. */\n\n");
     buffer_puts(&t->output,
@@ -1856,8 +1995,14 @@ void transpile(Transpiler *t)
     buffer_puts(&t->output, "#ifndef true\n#define true 1\n#endif\n#ifndef false\n#define false 0\n#endif\n\n");
     buffer_puts(&t->output, 
     "#ifndef bool\n"
+    "#if CMPL__PTR_SIZE == 8\n"
+    "#define bool unsigned int\n"
+    "#elif CMPL__PTR_SIZE == 4\n"
+    "#define bool unsigned short\n"
+    "#else\n"
     "#define bool unsigned char\n"
-    "#endif\n\n");
+    "#endif\n"
+    "#endif // #ifndef bool\n\n");
 #endif
     discover_range(t, &ns, 0, t->tokens.count - 1);
     transpile_range(t, &ns, 0, t->tokens.count - 1);

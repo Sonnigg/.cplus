@@ -10,7 +10,15 @@
 | structs::methods                | 2026-08-03 | 2026-08-03    |
 | enums                           | 2026-08-03 | 2026-08-03    |
 | enums::variants                 | 2026-08-03 | 2026-08-03    |
-| defer                           | 2026-08-05 | 2026-08-05    |
+| defer                           | 2026-08-05 | 2026-08-07    |
+| defer::lowering                 | 2026-08-07 | 2026-08-07    |
+| defer::loops                    | 2026-08-07 | 2026-08-07    |
+| defer::multiple                 | 2026-08-07 | 2026-08-07    |
+| defer::goto                     | 2026-08-07 | 2026-08-07    |
+| namespace                       | 2026-08-07 | 2026-08-07    |
+| namespace::edge_cases           | 2026-08-07 | 2026-08-07    |
+| types                           | 2026-08-07 | 2026-08-07    |
+| types::bool                     | 2026-08-07 | 2026-08-07    |
 
 # STATUS - WIP (1st August 2026)
 
@@ -267,3 +275,203 @@ defer {
 }
 ```
 > `defer foo();` will **not** work in any way, as `defer` strictly requires a scope after it.
+
+### Regarding defer's lowering (7th August 2026)
+`defer` writes its code block right before any return in its scope or child-scopes.
+
+`defer` lowering example
+```cx
+#include <io>
+void bar()
+{
+    SomeThing p = SomeThing::new();
+    defer {
+        p.die();
+        std::puts("Cleaned up!");
+    }
+
+    if (!p.data)
+    {
+        return;
+    }
+    foo(p);
+}
+```
+is lowered into
+```c
+// libc+/io.hp inlined here
+void bar()
+{
+    SomeThing p = SomeThing_new();
+    if (!p.data)
+    {
+        { p.die(); std_puts("Cleaned up!"); } return;
+    }
+    foo(p);
+    p.die();
+    std_puts("Cleaned up!");
+}
+```
+> Note that if bar had a return even after foo, the defer block would be written before it like in the conditional example, yet the non-block-scoped defer code would still be appended afterwards for these cases where no `return;` is given at the end of a void function.
+
+### Regarding defer and loops (7th August 2026)
+C+ does not declare `defer` in loops as undefined behaviour, but uses the 2 rules it has already established:
+1. emit at the lexical scope's end
+2. emit before any returns in the scope or children scopes.
+
+Meaning `defer` does not care if a break or continue is used, it does not put itself before that and only puts itself in front of the closing brace of its scope or any return in its scope or children scopes.
+
+`defer` in nested loops, specifically the loop below, depends entirely on the loop structure. The loop below is an example of a "run this loop, then another loop inside of it"-loop.
+
+generic short example
+```cx
+while (a)
+{
+    defer {
+        a.destruct();
+    }
+
+    while (b)
+    {
+        defer {
+            b.destruct();
+        }
+
+        break;
+    }
+}
+```
+lowers into
+```c
+while (a)
+{
+    while (b)
+    {
+        break;
+        TypeOfB_destruct(&b);
+    }
+    TypeOfA_destruct(&a);
+}
+```
+
+That means b.destruct() does not run, but a.destruct() will run as the loop `while (a)` is not exited before calling a.destruct().
+
+### Regarding multiple defer's (7th August 2026)
+C+ uses a LIFO approach to defer-unwinding, that means whichever defer was last put into the defer stack is the first defer to be emitted.
+
+### Regarding goto jumps and defer (7th August 2026)
+C+'s defer also does not analyze goto in any way and simply follows all of the above mentioned rules.
+
+example of `defer` and `goto`
+```cx
+void foo(bool a)
+{
+    defer {
+        bar();
+    }
+
+    if (a)
+        goto somewhere;
+    else
+        goto nowhere;
+
+    somewhere:
+    return;
+
+    nowhere:
+    {
+        baz();
+    }
+}
+```
+lowers into
+```c
+void foo(unsigned char a)
+{
+    if (a)
+        goto somewhere;
+    else
+        goto nowhere;
+    
+    somewhere:
+    { bar(); }
+    return;
+
+    nowhere:
+    {
+        baz();
+    }
+    bar();
+}
+```
+
+## About C+'s namespace (7th August 2026)
+C+ gives the opportunity to use namespaces to organise code and larger programs or libraries. Never do namespaces introduce any kind of overhead at runtime, as they are lowered into a predictable known C-layout.
+
+example of `namespace` and its lowering
+```cx
+#include <io>
+
+namespace mylib
+{
+    void sayHelloFromMyLib()
+    {
+        std::puts("Hello from myLib!");
+    }
+}
+```
+lowers into
+```c
+// libc+/io.hp inlined
+    void mylib_sayHelloFromMyLib()
+    {
+        std_puts("Hello from myLib!");
+    }
+```
+
+### Regarding C+'s edge-case with any and all namespace-like behaviour and #include (7th August 2026)
+C+ itself does not forbid using #include "..." or #include <...> inside of `namespace`, `struct` or `enum`, though it is undefined behaviour, even though the lowering would stay the same.
+
+## About C+'s type lowering (7th August 2026)
+C+ has a few types many of which are also found in C. C+'s types are as follows:
+
+    void
+
+    char
+
+    unsigned char
+
+    bool
+
+    short
+
+    unsigned short
+
+    int
+
+    unsigned int
+
+    long
+
+    unsigned long
+
+    long long
+
+    unsigned long long
+
+    float
+
+    double
+
+Though C+'s `bool` type lowers into `unsigned char`, meaning C+'s bool occupies exactly 1 byte and can represent any value from 0 to 255. All other types are lowered 1:1 to standard C types.
+
+### Regarding bool (7th August 2026)
+`bool` lowers into `unsigned char` and C+ does not forbid using any value in the 0-255 range as a boolean value, though typically C+ uses and encourages to use `true` (lowering into 1) and `false` (lowering into 0).
+
+examples of `bool` that would be allowed
+```cx
+bool b1 = 243;
+bool b2 = 19 ;
+bool b3 = 43 ;
+```
+> note that this could also be used to do arithmetic with true and false and even to use bool as a static_cast target for pointer normalisation.

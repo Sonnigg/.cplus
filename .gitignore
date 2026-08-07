@@ -4,8 +4,9 @@ tests/
 test_executables/
 bin/*.exe
 second_tests/
-cx/.vscode
-cx/.vscodeignore
-cx/extension.js
+cx/*.js
 cx/*.new
 *.txt
+*.exe
+*.cp
+*.c

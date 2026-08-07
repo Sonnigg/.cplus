@@ -6,7 +6,7 @@
 namespace std
 {
     /*
-        Integer types
+        Integer and boolN types
     */
     typedef unsigned char       uint8_t;  // max: 2^8  - 1
     typedef unsigned short      uint16_t; // max: 2^16 - 1
@@ -17,6 +17,11 @@ namespace std
     typedef signed short        int16_t;  // min: -(2^15), max: 2^15 - 1
     typedef signed int          int32_t;  // min: -(2^31), max: 2^31 - 1
     typedef signed long long    int64_t;  // min: -(2^63), max: 2^63 - 1
+
+    typedef uint64_t bool8;
+    typedef uint32_t bool4;
+    typedef uint16_t bool2;
+    typedef uint8_t  bool1;
 
     /*
         Pointer-sized types
