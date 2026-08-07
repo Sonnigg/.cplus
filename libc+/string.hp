@@ -53,11 +53,11 @@ namespace std
 
             if (!ptr)
             {
-                std::errputs("Out Of Memory, returning nullptr as data and 0 for the length and capacity (String::fromChars).");
+                std::errputs("Out Of Memory, returning nullptr as data and 0 for the length and capacity is the original string length (String::fromChars).");
                 return String {
                     __data: nullptr,
                     __len : 0,
-                    __cap : 0,
+                    __cap : length,
                 };
             }
 
