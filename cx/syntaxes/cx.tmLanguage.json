@@ -93,7 +93,7 @@
       "patterns": [
         {
           "name": "storage.type.cx",
-          "match": "\\b(void|char|short|int|long|float|double|bool([1248])?|unsigned|signed)\\b"
+          "match": "\\b(void|char|short|int|long|float|double|bool|unsigned|signed)\\b"
         },
         {
           "name": "storage.type.cx",

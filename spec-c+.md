@@ -463,10 +463,10 @@ C+ has a few types many of which are also found in C. C+'s types are as follows:
 
     double
 
-Though C+'s `bool` type lowers into `unsigned char`, meaning C+'s bool occupies exactly 1 byte and can represent any value from 0 to 255. All other types are lowered 1:1 to standard C types.
+Though C+'s `bool` type lowers into an architecture-dependent type entirely dependent on the native pointer size (explained and specified in the "Regarding bool" section, types::bool). All other types are lowered 1:1 to standard C types.
 
 ### Regarding bool (7th August 2026)
-`bool` lowers into `unsigned char` and C+ does not forbid using any value in the 0-255 range as a boolean value, though typically C+ uses and encourages to use `true` (lowering into 1) and `false` (lowering into 0).
+`bool` lowers into `unsigned T` where T is dependent on the native pointer size, generally for 64-bit targets bool lowers into `unsigned int`, 32-bit into `unsigned short` and 16-bit into `unsigned char`, and C+ does not forbid using any value in the 0-T_max range as a boolean value, though typically C+ uses and encourages to use `true` (lowering into 1) and `false` (lowering into 0).
 
 examples of `bool` that would be allowed
 ```cx
@@ -475,3 +475,14 @@ bool b2 = 19 ;
 bool b3 = 43 ;
 ```
 > note that this could also be used to do arithmetic with true and false and even to use bool as a static_cast target for pointer normalisation.
+
+C+'s types.hp (libc+) introduces `boolN_t` types for `bool1_t`, `bool2_t`, `bool4_t`, and `bool8_t` where N determines the number of bytes the bool type occupies, respectively, `bool` can be either `bool1_t`, `bool2_t`, or `bool4_t`, though as mentioned this depends on the native pointer size.
+
+examples of `boolN_t`
+```cx
+std::bool1_t b1 = true; // std::bool1_t == std::uint8_t
+std::bool2_t b2 = true; // std::bool2_t == std::uint16_t
+std::bool4_t b4 = true; // std::bool4_t == std::uint32_t
+std::bool8_t b8 = true; // std::bool8_t == std::uint64_t
+```
+> Note that `boolN_t` names the number of bytes it occupies, specified by N, whereas `intN_t` and `uintN_t` name the number of bits they occupy, specified by N.

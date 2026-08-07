@@ -18,10 +18,10 @@ namespace std
     typedef signed int          int32_t;  // min: -(2^31), max: 2^31 - 1
     typedef signed long long    int64_t;  // min: -(2^63), max: 2^63 - 1
 
-    typedef uint64_t bool8;
-    typedef uint32_t bool4;
-    typedef uint16_t bool2;
-    typedef uint8_t  bool1;
+    typedef uint64_t bool8_t;
+    typedef uint32_t bool4_t;
+    typedef uint16_t bool2_t;
+    typedef uint8_t  bool1_t;
 
     /*
         Pointer-sized types
