@@ -1,6 +1,6 @@
 // io.hp
 
-// subset of _io.hp that introduces std::String returning functions
+// superset of _io.hp that introduces std::String returning functions
 
 #ifndef __IO_HP
 #define __IO_HP
