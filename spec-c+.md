@@ -17,8 +17,9 @@
 | defer::goto                     | 2026-08-07 | 2026-08-07    |
 | namespace                       | 2026-08-07 | 2026-08-07    |
 | namespace::edge_cases           | 2026-08-07 | 2026-08-07    |
+| type-lowering                   | 2026-08-07 | 2026-08-07    |
+| type-lowering::bool             | 2026-08-07 | 2026-08-07    |
 | types                           | 2026-08-07 | 2026-08-07    |
-| types::bool                     | 2026-08-07 | 2026-08-07    |
 
 # STATUS - WIP (1st August 2026)
 
@@ -486,3 +487,40 @@ std::bool4_t b4 = true; // std::bool4_t == std::uint32_t
 std::bool8_t b8 = true; // std::bool8_t == std::uint64_t
 ```
 > Note that `boolN_t` names the number of bytes it occupies, specified by N, whereas `intN_t` and `uintN_t` name the number of bits they occupy, specified by N.
+
+## About C+'s types in libc+ and builtin (7th August 2026)
+C+ defines 14 types as its builtin types, though 1 of which (`bool`) is a compiler-macro depending on the architecture as declared and define in type-lowering and type-lowering::bool. libc+ declares and defines types in various files, one of the prominent ones is `types.hp` which defines 16 types, those being the following with examples.
+
+examples of the 16 `types.hp` defined types
+```cx
+std::int8_t  i1; // signed 8-bit  integer
+std::int16_t i2; // signed 16-bit integer
+std::int32_t i4; // signed 32-bit integer
+std::int64_t i8; // signed 64-bit integer
+
+std::uint8_t  u1; // unsigned 8-bit  integer
+std::uint16_t u2; // unsigned 16-bit integer
+std::uint32_t u4; // unsigned 32-bit integer
+std::uint64_t u8; // unsigned 64-bit integer
+
+std::bool8_t b8; // unsigned 64-bit integer
+std::bool4_t b4; // unsigned 32-bit integer
+std::bool2_t b2; // unsigned 16-bit integer
+std::bool1_t b1; // unsigned 8-bit  integer
+
+#if CMPL__PTR_SIZE == 8
+    typedef uint64_t ptrsize_t;  // unsigned 64-bit integer
+    typedef int64_t  sptrsize_t; //   signed 64-bit integer
+
+#elif CMPL__PTR_SIZE == 4
+    typedef uint32_t ptrsize_t;  // unsigned 32-bit integer
+    typedef int32_t  sptrsize_t; //   signed 32-bit integer
+
+#elif CMPL__PTR_SIZE == 2
+    typedef uint16_t ptrsize_t;  // unsigned 16-bit integer
+    typedef int16_t  sptrsize_t; //   signed 16-bit integer
+
+#endif
+    typedef ptrsize_t  size_t;  // depending on the above declared  ptrsize_t
+    typedef sptrsize_t ssize_t; // depending on the above declared sptrsize_t
+```
