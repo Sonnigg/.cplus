@@ -143,13 +143,13 @@ namespace std
     struct StringView
     {
         const char  *__data;
-        std::size_t *__len ; // points to a std::size_t to dynamically update __len
+        std::size_t __len ; // fucking hell, nevermind, no pointer to an std::size_t, just a length of the INITIAL creation
 
         static StringView fromChars(const char *const _chpString)
         {
             return StringView {
                 __data: _chpString,
-                __len : &std::stringLength(_chpString),
+                __len : std::stringLength(_chpString),
             };
         } // static std::StringView std::StringView::fromChars(const char *const _chpString)
 
@@ -157,7 +157,7 @@ namespace std
         {
             return StringView {
                 __data: _strpString->__data,
-                __len : &_strpString->__len,
+                __len : _strpString->__len,
             };
         }
 
@@ -172,7 +172,7 @@ namespace std
         {
             if (!self)
                 return 0;
-            return *(self->__len);
+            return self->__len;
         }
     } // struct StringView
 } // namespace std
